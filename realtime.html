@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>realtime</title>
+        <script type="text/javascript" src="js-runtime/reflect.js"></script>
+        <script src="realtime.js" defer></script>
+        <style>
+         body {
+             background-color: #000;
+         }
+        </style>
+    </head>
+    <body>
+        <button id="toggleaudio">Toggle Audio</button><br>
+        <canvas id="glcanvas" width="640" height="240"></canvas>
+
+        <div style="display: show;">
+            <div>DEBUG: shield freqs</div>
+            <div>
+                <input type="range" id="freq" name="freq" min="0.5" max="400" step="0.1" />
+                <label id="lblfreq"></label>
+            </div>
+            <div>
+                <input type="range" id="mod" name="mod" min="0.5" max="400" step="0.1" />
+                <label id="lblmod"></label>
+            </div>
+        </div>
+
+        <div>
+            <div>User Controls</div>
+            <div>
+                <input type="range" id="uc0" name="uc0" min="0.5" max="400" step="0.1" />
+                <label id="lbluc0"></label>
+            </div>
+            <div>
+                <input type="range" id="uc1" name="uc1" min="0.5" max="400" step="0.1" />
+                <label id="lbluc1"></label>
+            </div>
+        </div>
+
+		<div>
+			Greetings citizen! SWORD powers the planetary shields and your duty as a public servant is to intonate SWORD to correct harmonics in response to foreign invasion; in addition, each incident must have a report filed with correct form identifiers or you will be ... expired.
+		</div>
+    </body>
+</html>

@@ -1,0 +1,77 @@
+diff --git a/js-runtime/reflect.js b/js-runtime/reflect.js
+index 1e66c50..1ff4fb1 100644
+--- a/js-runtime/reflect.js
++++ b/js-runtime/reflect.js
+@@ -137,7 +137,18 @@ class Syntax extends HeapObject { toString() { return "#<syntax>"; } }
+ class Port extends HeapObject { toString() { return "#<port>"; } }
+ class Struct extends HeapObject { toString() { return "#<struct>"; } }
+ 
+-function instantiate_streaming(path, imports) {
++let module_map = {
++    // e.g. module_map["js-runtime/reflect.wasm"] = await WebAssembly.compileStreaming(fetch(...));
++};
++
++async function instantiate_streaming(path, imports) {
++    // TODO short circuit for testing but should this really be first ???
++    if (module_map.hasOwnProperty(path)) {
++        var module = module_map[path];
++        var instance = await WebAssembly.instantiate(module, imports);
++        return {module, instance};
++    }
++
+     if (typeof fetch !== 'undefined')
+         return WebAssembly.instantiateStreaming(fetch(path), imports);
+     let bytes;
+@@ -145,10 +156,16 @@ function instantiate_streaming(path, imports) {
+         bytes = read(path, 'binary');
+     } else if (typeof readFile !== 'undefined') {
+         bytes = readFile(path);
+-    } else {
++    } else if (typeof require !== 'undefined') {
+         let fs = require('fs');
+         bytes = fs.readFileSync(path);
++    } else if (module_map.hasOwnProperty(path)) {
++        bytes = module_map[path]; // TODO rename bytes ??? this is actually a module but works the same
++    } else {
++        throw new Error("instantiate_streaming has no method to get path");
+     }
++    // TODO is this wrong ??? destructuring elsewhere expects {module, instance} but at least on firefox
++    //      this is not that.
+     return WebAssembly.instantiate(bytes, imports);
+ }
+ 
+@@ -200,6 +217,9 @@ class Scheme {
+         let proc = new Procedure(this, mod.get_export('$load').value);
+         return proc.call();
+     }
++    static set_module_map(map) {
++        module_map = map;
++    }
+     static async load_main(path, abi, user_imports = {}) {
+         let mod = await SchemeModule.fetch_and_instantiate(path, abi, user_imports);
+         let reflect = await mod.reflect();
+@@ -551,7 +571,14 @@ class SchemeModule {
+                 file_buffer_set: (handle, i, x) => undefined,
+                 delete_file: (filename) => undefined
+             };
+-        } else { // nodejs
++        } else if (typeof WorkerGlobalScope !== 'undefined' || typeof AudioWorkletGlobalScope !== 'undefined') { // worker or audio worklet
++            let read_stdin = () => '';
++            this.#io_handler = {
++                write_stdout: console.log,
++                write_stderr: console.error,
++                read_stdin
++            }
++        } else if (typeof require !== 'undefined') { // nodejs
+             const fs = require('fs');
+             const process = require('process');
+             const bufLength = 1024;
+@@ -622,6 +649,8 @@ class SchemeModule {
+                 },
+                 delete_file: fs.rmSync.bind(fs)
+             };
++        } else {
++            throw new Error("failed to determine runtime environment");
+         }
+         this.#debug_handler = {
+             debug_str(x) { console.log(`debug: ${x}`); },

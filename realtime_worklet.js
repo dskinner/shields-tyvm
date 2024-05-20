@@ -148,7 +148,7 @@ async function instantiate_streaming(path, imports) {
         var instance = await WebAssembly.instantiate(module, imports);
         return {module, instance};
     }
-
+    
     if (typeof fetch !== 'undefined')
         return WebAssembly.instantiateStreaming(fetch(path), imports);
     let bytes;
@@ -575,7 +575,7 @@ class SchemeModule {
             let read_stdin = () => '';
             this.#io_handler = {
                 write_stdout: console.log,
-                write_stderr: console.error,
+                write_stderr: console.log,
                 read_stdin
             }
         } else if (typeof require !== 'undefined') { // nodejs
@@ -737,3 +737,80 @@ function repr(obj) {
         return string_repr(obj);
     return obj + '';
 }
+
+// ****************************************************************************
+
+class AudioSink extends AudioWorkletProcessor {
+    #scm;
+
+    static get parameterDescriptors() {
+        return [
+            {
+                name: "freq",
+                defaultValue: 440.0,
+                minValue: 0.5,
+                maxValue: 4000.0
+            },
+            {
+                name: "mod",
+                defaultValue: 0.5,
+                minValue: 0.5,
+                maxValue: 4000.0
+            },
+			{
+				name: "uc0",
+				defaultValue: 1.0,
+				minValue: 0.5,
+				maxValue: 4000.0
+			},
+			{
+				name: "uc1",
+				defaultValue: 1.0,
+				minValue: 0.5,
+				maxValue: 4000.0
+			}
+        ];
+    }
+
+
+    constructor(...args) {
+        super(...args);
+        this.port.onmessage = async (e) => {
+            module_map = e.data;
+            this.#scm = await Scheme.load_main("realtime_audio.wasm");
+			this.#scm[1](sampleRate);
+        }
+    }
+
+    process(inputs, outputs, parameters) {
+        if (typeof this.#scm === 'undefined') {
+            return true;
+        }
+
+        // TODO assumes [128]f32 everywhere
+		// TODO just passes first value of param array currently
+        let buf = this.#scm[0](parameters.freq[0], parameters.mod[0], parameters.uc0[0], parameters.uc1[0])[0];
+
+        // copy data
+        let n = buf.reflector.bytevector_length(buf);
+        let bin = new Uint8Array(n);
+        for (let i = 0; i < n; i++) {
+            bin[i] = buf.reflector.bytevector_ref(buf, i);
+        }
+        // project values
+        let f32s = new Float32Array(bin.buffer);
+
+        // TODO currently mono channel in scm but copy to all for now
+        const output = outputs[0];
+        for (let channel = 0; channel < output.length; ++channel) {
+            const outputChannel = output[channel];
+            for (let i = 0; i < outputChannel.length; ++i) {
+                outputChannel[i] = f32s[i];
+            }
+        }
+
+        return true;
+    }
+}
+
+registerProcessor('audio-sink', AudioSink);
