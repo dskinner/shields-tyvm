@@ -1,6 +1,10 @@
 # shields tyvm
 
+https://podatus.itch.io/shields-tyvm
+
 https://itch.io/jam/spring-lisp-game-jam-2024
+
+https://github.com/dskinner/shields-tyvm
 
 ## TODO
 
