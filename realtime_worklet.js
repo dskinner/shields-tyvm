@@ -747,27 +747,21 @@ class AudioSink extends AudioWorkletProcessor {
         return [
             {
                 name: "freq",
-                defaultValue: 440.0,
-                minValue: 0.5,
+                defaultValue: 229.0,
+                minValue: 200.0,
                 maxValue: 4000.0
             },
             {
-                name: "mod",
-                defaultValue: 0.5,
-                minValue: 0.5,
+                name: "modfreq",
+                defaultValue: 313.0,
+                minValue: 60.0,
                 maxValue: 4000.0
             },
 			{
-				name: "uc0",
-				defaultValue: 1.0,
-				minValue: 0.5,
-				maxValue: 4000.0
-			},
-			{
-				name: "uc1",
-				defaultValue: 1.0,
-				minValue: 0.5,
-				maxValue: 4000.0
+				name: "modphase",
+				defaultValue: 0.0,
+				minValue: 0.0,
+				maxValue: 0.5
 			}
         ];
     }
@@ -789,7 +783,7 @@ class AudioSink extends AudioWorkletProcessor {
 
         // TODO assumes [128]f32 everywhere
 		// TODO just passes first value of param array currently
-        let buf = this.#scm[0](parameters.freq[0], parameters.mod[0], parameters.uc0[0], parameters.uc1[0])[0];
+        let buf = this.#scm[0](parameters.freq[0], parameters.modfreq[0], parameters.modphase[0])[0];
 
         // copy data
         let n = buf.reflector.bytevector_length(buf);

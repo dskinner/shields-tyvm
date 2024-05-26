@@ -1,8 +1,20 @@
-const audioContext = new AudioContext({sampleRate: 44100});
+const audioContext = new AudioContext({sampleRate: 8000});
 const analyser = audioContext.createAnalyser();
 analyser.fftSize = 2048
 const analyserData = new Float32Array(2048);
 const waveformData = new Float32Array(4096);
+
+let difficulty = 12.0;
+
+function getRMS() {
+	let m = 0;
+	for (let i = 0; i < 2048; i++) {
+		const v = analyserData[i];
+		m += v*v;
+	}
+	const rms = Math.sqrt(m);
+	return rms;
+}
 
 window.addEventListener("load", async function() {
     const canvas = document.querySelector("#glcanvas");
@@ -25,7 +37,7 @@ window.addEventListener("load", async function() {
         }
     }
 
-    await Scheme.load_main("realtime_webgl.wasm", {}, {
+    const scm = await Scheme.load_main("realtime_webgl.wasm", {}, {
         webgl: bindings,
         window: {
             requestAnimationFrame: requestAnimationFrame
@@ -35,11 +47,20 @@ window.addEventListener("load", async function() {
                 // TODO not clear how best to share array here so process in js for now
                 analyser.getFloatTimeDomainData(analyserData);
                 for (let i = 0; i < 2048; i++) {
-                    waveformData[i*2] = (i/2048)*4-1;
-                    waveformData[i*2+1] = analyserData[i];
+                    waveformData[i*2] = (i/2048)*4-1;      // x
+                    waveformData[i*2+1] = analyserData[i]; // y
                 }
                 return waveformData;
-            }
+            },
+			getRMS() {
+				let m = 0;
+				for (let i = 0; i < 2048; i++) {
+					const v = analyserData[i];
+					m += v*v;
+				}
+				const rms = Math.sqrt(m);
+				return rms;
+			}
         }
     });
 
@@ -57,54 +78,117 @@ window.addEventListener("load", async function() {
     document.querySelector("#toggleaudio").onclick = function() { audioContext.state === "running" ? audioContext.suspend() : audioContext.resume(); };
 
 	// TODO below can all probably move to scm
-	
-	const freqParam = audioSink.parameters.get("freq");
-	document.querySelector("#freq").oninput = function() {
-		document.querySelector("#lblfreq").innerText = this.value + "hz";
-		freqParam.setValueAtTime(this.value, audioContext.currentTime);
-	};
 
-	const modParam = audioSink.parameters.get("mod");
-	document.querySelector("#mod").oninput = function() {
-		document.querySelector("#lblmod").innerText = this.value + "hz";
-		modParam.setValueAtTime(this.value, audioContext.currentTime);
-	};
+	function mapAudioParam(name) {
+		const param = audioSink.parameters.get(name);
+		const label = document.querySelector(`#lbl${name}`);
+		const input = document.querySelector(`#${name}`);
 
-	const uc0Param = audioSink.parameters.get("uc0");
-	document.querySelector("#uc0").oninput = function() {
-		document.querySelector("#lbluc0").innerText = this.value + "hz";
-		uc0Param.setValueAtTime(this.value, audioContext.currentTime);
-	};
+		input.min = param.minValue;
+		input.max = param.maxValue;
 
-	const uc1Param = audioSink.parameters.get("uc1");
-	document.querySelector("#uc1").oninput = function() {
-		document.querySelector("#lbluc1").innerText = this.value + "hz";
-		uc1Param.setValueAtTime(this.value, audioContext.currentTime);
-	};
+		label.innerText = param.value + "hz";
+		input.value = param.value
+		input.oninput = function() {
+			label.innerText = this.value + "hz";
+			param.setValueAtTime(this.value, audioContext.currentTime);
+		};
+
+		return {param, label, input};
+	}
+
+	const freq = mapAudioParam("freq");
+	const modfreq = mapAudioParam("modfreq");
+	const modphase = mapAudioParam("modphase");
+
+	function setAudioParam(o, v) {
+		o.param.setValueAtTime(v, audioContext.currentTime);
+		o.label.innerText = o.param.value.toFixed(3) + "hz";
+		o.input.value = o.param.value;
+	}
+
+	function setAudioParamRandom(o) {
+		setAudioParam(o, randomFloat(o.param.minValue, o.param.maxValue));
+	}
+
+	function randomFloat(s, e) {
+		return s + (Math.random()*(e-s));
+	}
+
+	function generateAttack() {
+		setAudioParamRandom(freq);
+		setAudioParamRandom(modfreq);
+		setAudioParamRandom(modphase);
+	}
 
 	addEventListener("keydown", function(ev) {
-		if (ev.keyCode != 32) {
-			return;
+		if (ev.keyCode == 32) {
+			setAudioParam(modphase, 0.0);
 		}
-		uc1Param.setValueAtTime(2.0, audioContext.currentTime);
+
+		if (ev.keyCode == 82) {
+			generateAttack();
+		}
 	});
 
-	addEventListener("keyup", function(ev) {
-		if (ev.keyCode != 32) {
-			return;
-		}
-		uc1Param.setValueAtTime(0.5, audioContext.currentTime);
-	});
 
+	const incoming = document.querySelector("#incoming");
+	const damage = document.querySelector("#damage");
+	const survived = document.querySelector("#survived");
+	let dmg = 0;
+	let iter = 0;
+	let surv = 0;
+
+	const countdown = 10;
+	scm[1](difficulty);
+
+	for (const inp of document.querySelectorAll("input[name=difficulty]")) {
+		inp.onchange = function() {
+			const x = parseFloat(this.value);
+			console.log(`setting difficulty to ${x}`);
+			difficulty = x;
+			scm[1](difficulty);
+		}
+	}
+	
+	function lp() {
+		iter++;
+		const n = (countdown-1)-(iter%countdown);
+		incoming.innerText = `Incoming in ${n} seconds!`;
+		if (n == 0) {
+			const rms = getRMS();
+			if (rms >= difficulty) {
+				// dmg += 2*(rms-difficulty);
+				dmg += 1.5*rms; // penalty
+			} else if (rms >= 1.0) {
+				dmg += rms/2;
+			} else {
+				// dmg += (rms-difficulty)/2; // recover some shields
+				// if (dmg < 0) { dmg = 0; }
+			}
+			damage.innerText = `Damage: ${dmg.toFixed(3)}%`
+			if (dmg < 100) {
+				generateAttack();
+				surv++;
+				survived.innerText = `Survived ${surv} attack(s)!`;
+
+			} else {
+				// game over
+				audioContext.suspend();
+			}
+		}
+		if (dmg < 100) {
+			setTimeout(lp, 1000);
+		}
+	}
+	setTimeout(lp, 1000);
+	
 
 	/*
 	  113.1
 	  0.4
 	  113.1
 	  0
-
-	  maybe a blast changes shield freq permanently and then modulator falls and recovers over time,
-	  then goal is to find the new frequency by ear and fixing phase by turning 2nd modulator on/off
 
 	  113.1
 	  25.1

@@ -13,7 +13,7 @@
   (expt 10 (/ dB 20)))
 
 (define twopi (* 2 (acos -1)))
-(define default-sample-rate 48000) ;; set from worklet
+(define default-sample-rate 0) ;; set from worklet
 (define default-buffer-length 128) ;; webaudio api default
 ;; (define default-amp-factor (decibel->amp -10))
 
@@ -90,12 +90,14 @@
          (vector-set! out i (* ampfac (discrete-at in (+ phase offset))))
          (set! phase (+ phase interval)))))))
 
-;; TODO additive mixing ???
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; mixer.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
 (define (sum l i)
   (if (null? l)
       0
       (+ (vector-ref (car l) i) (sum (cdr l) i))))
 
+;; additive mixer
 (define (mixer . ins)
   (let ((out (make-vector default-buffer-length)))
     (lambda ()
@@ -165,31 +167,33 @@
 ;;              (oscil sine
 ;;                     #:freq 240.2)))
 
+
+;; 400:375
+;; 400:1000
+
+;; 440: 572
+;; 440: 550
+;; 220: 550 sounds like a warning
+
 (define sine (discrete-sine))
 
-;; user controls
-(define osc-uc1 (oscil sine))
-(define osc-uc0 (oscil sine #:mod-freq osc-uc1 #:amp (decibel->amp -10)))
-;; (define osc-uc1 (oscil sine))
-;; (define osc-uc0 (oscil sine))
-
-;; shield controls
-(define osc-sh1 (oscil sine #:mod-freq osc-uc0))
-(define osc-sh0 (oscil sine #:mod-freq osc-sh1 #:amp (decibel->amp -10)))
-
-(define mix (mixer (osc-sh0) ))
+(define osc-mod-phase (oscil sine))
+(define osc-mod-freq (oscil sine))
+(define osc-shield-0 (oscil sine #:mod-freq osc-mod-freq #:amp (decibel->amp -10)))
+(define osc-shield-1 (oscil sine #:mod-freq osc-mod-freq #:amp (decibel->amp -10) #:mod-phase osc-mod-phase))
+(define mix (mixer (osc-shield-0) (osc-shield-1)))
 
 (define time-code 0)
 (define buf (make-bytevector (* 4 default-buffer-length)))
 
-(define (prepare sh0 sh1 uc0 uc1)
+(define (prepare freq mod-freq mod-phase)
   (set! time-code (+ 1 time-code))
 
   ;; TODO sort and prepare graph
-  (osc-uc1 time-code uc1)
-  (osc-uc0 time-code uc0)
-  (osc-sh1 time-code sh1)
-  (osc-sh0 time-code sh0)
+  (osc-mod-phase time-code mod-phase)
+  (osc-mod-freq time-code mod-freq)
+  (osc-shield-0 time-code freq)
+  (osc-shield-1 time-code freq)
 
   ;; (define out (osc-sh0))
   (define out (mix))

@@ -93,6 +93,10 @@
   "analyser" "getFloatTimeDomainData"
   -> (ref null extern))
 
+(define-foreign get-rms
+  "analyser" "getRMS"
+  -> f32)
+
 (define vsrc
   (string-append "attribute vec4 aVertexPosition;"
                  "void main() {"
@@ -122,28 +126,20 @@
 
 (define program (init-shaders))
 (define vertex-position (gl-get-attrib-location program "aVertexPosition"))
-
-(define red 0.01)
- ;; TODO see issues#167 variable reference of - and / result in RuntimeError: bad cast
-
-(define op 'add)
-
 (define buffer (gl-create-buffer))
+
+(define difficulty 8.0) ;; 7 hard, 8 medium, 9 easy
  
 (define (draw now)
-  (when (> red 1)
-    (set! op 'sub))
-  (when (< red 0)
-    (set! op 'add))
-  ;; (set! red (op red 0.01))
-  (if (equal? op 'add)
-      (set! red (+ red 0.01))
-      (set! red (- red 0.01)))
   
-  (gl-clear-color red 0.5 0.0 1.0)
-  (gl-clear GL_COLOR_BUFFER_BIT)
+  (let ((data (get-float-time-domain-data))
+        (rms (get-rms)))
+    ;; values over 8 would be considered shields down, so full red
+    (define r (max 0.0 (min 1.0 (/ rms difficulty))))
+    (define g (- 1.0 r))
+    (gl-clear-color r g 0.0 1.0)
+    (gl-clear GL_COLOR_BUFFER_BIT)
 
-  (let ((data (get-float-time-domain-data)))
     (gl-bind-buffer GL_ARRAY_BUFFER buffer)
     (gl-buffer-data GL_ARRAY_BUFFER data GL_STATIC_DRAW)
 
@@ -151,15 +147,16 @@
     (gl-enable-vertex-attrib-array vertex-position)
 
     (gl-use-program program)
+    ;; TODO fix line wrapping back onto itself with draw index
     (gl-draw-arrays GL_LINES 0 1024))
   
   (request-animation-frame draw*))
  
 (define draw* (procedure->external draw))
 (request-animation-frame draw*)
- 
-(values draw*)
 
-;; (call-with-output-file "realtime_webgl.wasm"
-;;   (λ (port)
-;;     (put-bytevector port (assemble-wasm (compile src)))))
+(define (difficulty-set! x)
+  (set! difficulty x))
+(define difficulty-set!* (procedure->external difficulty-set!))
+ 
+(values draw* difficulty-set!*)
