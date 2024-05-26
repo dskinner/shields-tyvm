@@ -4,7 +4,7 @@ analyser.fftSize = 2048
 const analyserData = new Float32Array(2048);
 const waveformData = new Float32Array(4096);
 
-let difficulty = 12.0;
+let difficulty = 8.0;
 
 function getRMS() {
 	let m = 0;

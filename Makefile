@@ -21,8 +21,8 @@ serve: game.wasm
 	guile -c '((@ (hoot web-server) serve))'
 
 bundle: realtime.wasm
-	rm game.zip || true
-	zip game.zip -r js-runtime/ realtime.js realtime_worklet.js realtime.css index.html realtime_audio.wasm realtime_webgl.wasm
+	rm shields-tyvm.zip || true
+	zip shields-tyvm.zip -r assets/ js-runtime/ realtime.js realtime_worklet.js realtime.css index.html realtime_audio.wasm realtime_webgl.wasm
 
 # zip game.zip -r assets/ js-runtime/ game.js game.css game.wasm index.html
 

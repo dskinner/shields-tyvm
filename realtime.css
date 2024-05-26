@@ -1,8 +1,19 @@
 body {
     background-color: #000;
 	margin: auto;
-	width: 640px;
+	width: 1024px;
 	color: #eee;
+}
+
+.container {
+	margin: auto;
+	width: 1024px;
+	background-image: url("assets/sword.png");
+	background-repeat: no-repeat;
+}
+
+.content {
+	width: 640px;
 }
 
 #uc {

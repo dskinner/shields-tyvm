@@ -10,6 +10,7 @@ https://github.com/dskinner/shields-tyvm
 
 * there's a mix of javascript that the game jam template would make unnecessary
 * use the new module system for audio and graphic stack
+* soften sound
 
 # Guile Hoot Game Jam Template
 
