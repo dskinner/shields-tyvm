@@ -121,6 +121,10 @@ window.addEventListener("load", async function() {
 		setAudioParamRandom(modphase);
 	}
 
+	// modphase.input.onchange = function() {
+	// 	setAudioParam(modphase, 0.0);
+	// };
+
 	addEventListener("keydown", function(ev) {
 		if (ev.keyCode == 32) {
 			setAudioParam(modphase, 0.0);
@@ -135,9 +139,11 @@ window.addEventListener("load", async function() {
 	const incoming = document.querySelector("#incoming");
 	const damage = document.querySelector("#damage");
 	const survived = document.querySelector("#survived");
+	const perfect = document.querySelector("#perfect");
 	let dmg = 0;
 	let iter = 0;
 	let surv = 0;
+	let perf = 0;
 
 	const countdown = 10;
 	scm[1](difficulty);
@@ -163,10 +169,12 @@ window.addEventListener("load", async function() {
 			} else if (rms >= 1.0) {
 				dmg += rms/2;
 			} else {
+				perf += 1;
 				// dmg += (rms-difficulty)/2; // recover some shields
 				// if (dmg < 0) { dmg = 0; }
 			}
 			damage.innerText = `Damage: ${dmg.toFixed(3)}%`
+			perfect.innerText = `Perfectly thwarted ${perf} attack(s)!`;
 			if (dmg < 100) {
 				generateAttack();
 				surv++;
