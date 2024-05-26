@@ -20,9 +20,11 @@ game.wasm: game.scm $(modules)
 serve: game.wasm
 	guile -c '((@ (hoot web-server) serve))'
 
-bundle: game.wasm
+bundle: realtime.wasm
 	rm game.zip || true
-	zip game.zip -r assets/ js-runtime/ game.js game.css game.wasm index.html
+	zip game.zip -r js-runtime/ realtime.js realtime_worklet.js realtime.css index.html realtime_audio.wasm realtime_webgl.wasm
+
+# zip game.zip -r assets/ js-runtime/ game.js game.css game.wasm index.html
 
 clean:
 	rm -f game.wasm game.zip

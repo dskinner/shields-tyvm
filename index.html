@@ -1,17 +1,64 @@
 <!DOCTYPE html>
 <html>
-  <head>
-    <script type="text/javascript" src="js-runtime/reflect.js"></script>
-    <script type="text/javascript" src="game.js"></script>
-    <link rel="stylesheet" href="game.css" />
-    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-  </head>
-  <body>
-    <canvas id="canvas"></canvas>
-    <p id="wasm-error" hidden="true">
-      A browser with Wasm GC and tail call support is required to play
-      this game.  We recommend using either Mozilla Firefox or Google
-      Chrome.  Safari is currently unsupported.
-    </p>
-  </body>
+    <head>
+        <title>realtime</title>
+        <script type="text/javascript" src="js-runtime/reflect.js"></script>
+        <script src="realtime.js" defer></script>
+		<link rel="stylesheet" href="realtime.css" />
+		<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    </head>
+    <body>
+        <button id="toggleaudio">Toggle Audio</button>
+
+		<input type="radio" id="easy" name="difficulty" value="9.0" />
+		<label for="easy">easy</label>
+		<input type="radio" id="medium" name="difficulty" value="8.0" checked />
+		<label for="medium">medium</label>
+		<input type="radio" id="hard" name="difficulty" value="4.0" />
+		<label for="hard">hard</label>
+
+
+		<br>
+        <canvas id="glcanvas" width="640" height="240"></canvas>
+
+		<div id="uc">
+			<div>
+				<div>
+					<input type="range" id="freq" step="0.1" disabled />
+					<label id="lblfreq"></label>
+				</div>
+				<div>
+					<input type="range" id="modfreq" step="0.1" />
+					<label id="lblmodfreq"></label>
+				</div>
+				<div>
+					<input type="range" id="modphase" step="0.001" />
+					<label id="lblmodphase"></label>
+				</div>
+			</div>
+
+			<div id="stats">
+				<div id="incoming"></div>
+				<div id="damage"></div>
+				<div id="survived"></div>
+				<div id="perfect"></div>
+			</div>
+		</div>
+
+		<p>
+			Greetings citizen! SWORD powers the planetary shields and your duty as a public servant is to intonate SWORD to correct harmonics in response to foreign invasion; in addition, each incident must have a report filed with correct form identifiers!
+		</p>
+
+		<h4>HELP</h4>
+		<p>
+			The 2nd slider controls phase modulation of duplicate signal; any value above zero will offset phase; lock-in an offset by reducing to zero.
+		</p>
+		<p>SPACEBAR will quickly set phase modulation to zero on keydown!</p>
+		<p>The 1st slider controls frequency modulation which may assist in reducing shield RMS values.</p>
+		<p id="wasm-error">
+			A browser with Wasm GC and tail call support is required to play
+			this game.  We recommend using either Mozilla Firefox or Google
+			Chrome.  Safari is currently unsupported.
+		</p>
+    </body>
 </html>

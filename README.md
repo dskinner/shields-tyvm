@@ -1,3 +1,12 @@
+# shields tyvm
+
+https://itch.io/jam/spring-lisp-game-jam-2024
+
+## TODO
+
+* there's a mix of javascript that the game jam template would make unnecessary
+* use the new module system for audio and graphic stack
+
 # Guile Hoot Game Jam Template
 
 This repository is the quickest way to get started building games in
