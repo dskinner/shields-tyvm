@@ -16,25 +16,25 @@ function getRMS() {
 	return rms;
 }
 
-window.addEventListener("load", async function() {
-    const canvas = document.querySelector("#glcanvas");
+async function gameInit() {
+const canvas = document.querySelector("#glcanvas");
     const webgl = canvas.getContext("webgl");
     if (webgl === null) {
         return console.error("unable to init webgl");
     }
 
     const bindings = {};
-    const skiplist = ["canvas", "drawingBufferWidth", "drawingBufferHeight"];
+    const skiplist = ["canvas", "drawingBufferWidth", "drawingBufferHeight", "drawingBufferColorSpace", "unpackColorSpace", "drawingBufferFormat"];
     for (const name of Object.getOwnPropertyNames(WebGLRenderingContext.prototype)) {
         if (skiplist.includes(name)) {
             continue;
         }
-        const prop = WebGLRenderingContext.prototype[name];
-        if (typeof(prop) === "function") {
-            // e.g. {clearColor: WebGLRenderingContext.prototype.clearColor.bind(webgl),
-            //            clear: WebGLRenderingContext.prototype.clear.bind(webgl)}
-            bindings[name] = prop.bind(webgl);
-        }
+		const prop = WebGLRenderingContext.prototype[name];
+		if (typeof(prop) === "function") {
+			// e.g. {clearColor: WebGLRenderingContext.prototype.clearColor.bind(webgl),
+			//            clear: WebGLRenderingContext.prototype.clear.bind(webgl)}
+			bindings[name] = prop.bind(webgl);
+		}
     }
 
     const scm = await Scheme.load_main("realtime_webgl.wasm", {}, {
@@ -164,14 +164,11 @@ window.addEventListener("load", async function() {
 		if (n == 0) {
 			const rms = getRMS();
 			if (rms >= difficulty) {
-				// dmg += 2*(rms-difficulty);
 				dmg += 1.5*rms; // penalty
 			} else if (rms >= 1.0) {
 				dmg += rms/2;
 			} else {
 				perf += 1;
-				// dmg += (rms-difficulty)/2; // recover some shields
-				// if (dmg < 0) { dmg = 0; }
 			}
 			damage.innerText = `Damage: ${dmg.toFixed(3)}%`
 			perfect.innerText = `Perfectly thwarted ${perf} attack(s)!`;
@@ -214,4 +211,7 @@ window.addEventListener("load", async function() {
 	  57.6, then 0.5 or 2
 	  */
 
-});
+
+}
+
+window.addEventListener("load", gameInit);
