@@ -1,22 +1,21 @@
-(define-module (snd)
-  #:pure
-  #:use-module (scheme base)
-  #:use-module (hoot ffi)
-  #:export (discrete-sine oscil))
+(import (scheme base)
+        (scheme inexact)
+        (only (hoot bytevectors) bytevector-ieee-single-native-set!)
+        (hoot debug)
+        (hoot ffi)
+        (only (hoot syntax) case-lambda define* lambda*))
 
 (define (hertz->angular hz)
   (* twopi hz))
-
 (define (hertz->angular/normalize hz sr)
   (/ (hertz->angular hz) sr))
-
 (define (decibel->amp dB)
   (expt 10 (/ dB 20)))
 
 (define twopi (* 2 (acos -1)))
-(define default-sample-rate 48000)
-(define default-buffer-length 128) ;; web audio api default
-(define default-amp-factor (decibel->amp -10))
+(define default-sample-rate 0) ;; set from worklet
+(define default-buffer-length 128) ;; webaudio api default
+;; (define default-amp-factor (decibel->amp -10))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; signal.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
@@ -26,13 +25,13 @@
   "Uses the fractional component of t to return an interpolated sample."
   (when (< t 0)
     (set! t (- t)))
-  (set! t (- t (floor t))) ;; TODO use truncate, but missing; floor works since we abs above
+  (set! t (- t (truncate t)))
   (set! t (* t (vector-length sig)))
-  (define frac (- t (floor t)))
-  (define i (exact (floor (- t frac))))
+  (define frac (- t (truncate t)))
+  (define i (exact (truncate (- t frac))))
   (if (= 0 frac)
       (vector-ref sig i)
-      (let ((j (1+ i)))
+      (let ((j (+ 1 i)))
         (when (= j (vector-length sig))
           (set! j 0))
         (+ (* (- 1 frac) (vector-ref sig i)) (* frac (vector-ref sig j))))))
@@ -41,9 +40,9 @@
   "Uses the fractional component of t to return the sample at the truncated index."
   (when (< t 0)
     (set! t (- t)))
-  (set! t (- t (floor t)))
+  (set! t (- t (truncate t)))
   (set! t (* t (vector-length sig)))
-  (vector-ref sig (exact (floor t))))
+  (vector-ref sig (exact (truncate t))))
 
 (define (discrete-index sig i)
   (vector-ref sig (modulo i (- (vector-length sig) 1))))
@@ -68,33 +67,51 @@
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; oscil.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; TODO optional kwargs not-implemented; freq-mod amp-mod phase-mod
+(define* (oscil in #:key (freq 440) (mod-freq #f) (phase 0) (mod-phase #f) (amp 1) (mod-amp #f))
+  (let ((out (make-vector default-buffer-length)))
+    (case-lambda
+      (() out)
+      ((tc newfreq)
+       (when newfreq
+         (set! freq newfreq))
+       (define frame (* (- tc 1) (vector-length out)))
+       (define nfreq (/ freq default-sample-rate))
+       (do ((i 0 (+ 1 i))
+            (interval nfreq nfreq)
+            (offset 0 0)
+            (ampfac amp amp))
+           ((= i (vector-length out)) out)
+         (when mod-freq
+           (set! interval (* interval (discrete-index (mod-freq) (+ frame i)))))
+         (when mod-phase
+           (set! offset (discrete-index (mod-phase) (+ frame i))))
+         (when mod-amp
+           (set! ampfac (* ampfac (discrete-index (mod-amp) (+ frame i)))))
+         (vector-set! out i (* ampfac (discrete-at in (+ phase offset))))
+         (set! phase (+ phase interval)))))))
 
-;; (define* (oscil in freq . mods)
-;;   (define freq-mod (if (> (length mods) 0) (car mods) #f))
-;;   (let ((phase 0)
-;;         (out (make-vector default-buffer-length)))
-;;     (case-lambda
-;;       (() out)
-;;       ((tc)
-;;        (define frame (* tc (vector-length out)))
-;;        (define nfreq (/ freq default-sample-rate))
-;;        (do ((i 0 (+ 1 i))
-;;             (interval nfreq nfreq))
-;;            ((= i (vector-length out)) out)
-;;          (when freq-mod
-;;            (set! interval (* interval (discrete-index (freq-mod) (+ frame i)))))
-;;          (vector-set! out i (discrete-at in phase))
-;;          (set! phase (+ phase interval)))))))
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; mixer.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+
+(define (sum l i)
+  (if (null? l)
+      0
+      (+ (vector-ref (car l) i) (sum (cdr l) i))))
+
+;; additive mixer
+(define (mixer . ins)
+  (let ((out (make-vector default-buffer-length)))
+    (lambda ()
+      (do ((i 0 (+ 1 i)))
+          ((= i (vector-length out)) out)
+        (vector-set! out i (sum ins i))))))
 
 ;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; filter.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; TODO low-pass
+;;    ;; TODO low-pass
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; delay.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; delay.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
-;; TODO tap
+;;    ;; TODO tap
 
-;; TODO comb
-     
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; main.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;    ;; TODO comb
+ 

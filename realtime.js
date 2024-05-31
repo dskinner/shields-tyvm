@@ -37,11 +37,38 @@ const canvas = document.querySelector("#glcanvas");
 		}
     }
 
+	const memory = new WebAssembly.Memory({
+        initial: 2048,
+        maximum: 2048
+      });
+
     const scm = await Scheme.load_main("realtime_webgl.wasm", {}, {
+		mem: {
+			getMemory: () => memory
+		},
         webgl: bindings,
         window: {
             requestAnimationFrame: requestAnimationFrame
         },
+		document: {
+			getElementById: (id) => document.getElementById(id)
+		},
+		element: {
+			width: (el) => el.width,
+			height: (el) => el.height
+		},
+		event: {
+			addEventListener: (target, type, listener) => target.addEventListener(type, listener),
+			preventDefault: (event) => event.preventDefault(),
+			offsetX: (event) => event.offsetX,
+			offsetY: (event) => event.offsetY
+		},
+		array: {
+			newFloat32Array: (size) => new Float32Array(size),
+			setFloat32Array: (a, i, v) => a[i] = v,
+			getFloat32Array: (a, i) => a[i],
+			bufFloat32Array: (a) => a.buffer
+		},
         analyser: {
             getFloatTimeDomainData() {
                 // TODO not clear how best to share array here so process in js for now

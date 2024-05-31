@@ -1,11 +1,59 @@
-(import (scheme base)
+(import (except (scheme base) bytevector bytevector-append bytevector-copy bytevector-copy! bytevector-length bytevector-u8-ref bytevector-u8-set! bytevector? make-bytevector)
         (scheme inexact)
-        (only (hoot bytevectors) bytevector-ieee-single-native-set!)
+        (scheme write)
+        (hoot bytevectors)
+        ;; (only (hoot bytevectors) bytevector-ieee-single-native-set! bytevector-ieee-single-native-ref)
         (hoot debug)
         (hoot ffi)
-        (only (hoot syntax) define*)
-        (only (hoot syntax) case-lambda))
+        (only (hoot syntax) case-lambda define*))
 
+(define-foreign get-element-by-id
+  "document" "getElementById"
+  (ref string) -> (ref null extern))
+
+(define-foreign add-event-listener!
+  "event" "addEventListener"
+  (ref extern) (ref string) (ref extern) -> none)
+
+(define-foreign prevent-default!
+  "event" "preventDefault"
+  (ref extern) -> none)
+
+(define-foreign offset-x
+  "event" "offsetX"
+  (ref extern) -> i32)
+
+(define-foreign offset-y
+  "event" "offsetY"
+  (ref extern) -> i32)
+
+(define-foreign element-width
+  "element" "width"
+  (ref extern) -> i32)
+
+(define-foreign element-height
+  "element" "height"
+  (ref extern) -> i32)
+
+(define-foreign make-array-f32
+  "array" "newFloat32Array"
+  i32 -> (ref extern))
+
+(define-foreign array-f32-ref
+  "array" "getFloat32Array"
+  (ref extern) i32 -> f32)
+
+(define-foreign array-f32-set!
+  "array" "setFloat32Array"
+  (ref extern) i32 f32 -> none)
+
+(define-foreign array-f32-buf
+  "array" "bufFloat32Array"
+  (ref extern) -> (ref extern))
+
+(define-foreign get-memory
+  "mem" "getMemory"
+  -> (ref extern))
 
 (define GL_POINTS 0)
 (define GL_LINES 1)
@@ -101,6 +149,7 @@
   (string-append "attribute vec4 aVertexPosition;"
                  "void main() {"
                  "  gl_Position = aVertexPosition;"
+                 "  gl_PointSize = 3.0;"
                  "}"))
 
 (define fsrc
@@ -128,6 +177,23 @@
 (define vertex-position (gl-get-attrib-location program "aVertexPosition"))
 (define buffer (gl-create-buffer))
 
+;; https://developer.mozilla.org/en-US/docs/WebAssembly/JavaScript_interface/Memory
+;; https://github.com/WebAssembly/design/issues/1231
+
+(define buf2 (make-bytevector (* 4 2048)))
+(define buf (make-array-f32 2048))
+(define bufv (array-f32-buf buf))
+(define mem (get-memory))
+(define val -1.0)
+(do ((i 0 (+ 1 i)))
+    ((= i 2048) buf)
+  (array-f32-set! buf i val)
+  (bytevector-ieee-single-native-set! buf2 (* 4 i) val)
+  (set! val (+ val 0.01)))
+;; (define input-x 0.0)
+;; (define input-y 0.0)
+;; (define input-buffer (gl-create-buffer))
+
 (define difficulty 8.0) ;; 7 hard, 8 medium, 9 easy
  
 (define (draw now)
@@ -148,7 +214,7 @@
 
     (gl-use-program program)
     ;; TODO fix line wrapping back onto itself with draw index
-    (gl-draw-arrays GL_LINES 0 1024))
+    (gl-draw-arrays GL_POINTS 0 1024))
   
   (request-animation-frame draw*))
  
@@ -158,5 +224,42 @@
 (define (difficulty-set! x)
   (set! difficulty x))
 (define difficulty-set!* (procedure->external difficulty-set!))
- 
+
+
+;; ---------------------------------
+
+;; TODO push events to gesture filter
+
+(define canvas (get-element-by-id "glcanvas"))
+(define canvas-w (element-width canvas))
+(define canvas-h (element-height canvas))
+
+(define (trace . objs)
+  (for-each display objs)
+  (newline)
+  (flush-output-port))
+
+(define (trace-mouse-event ev)
+  (trace "[x=" (offset-x ev) "][y=" (offset-y ev) "]"))
+
+(define (on-mouse-down ev)
+  (prevent-default! ev)
+  (trace-mouse-event ev))
+
+(define (on-mouse-move ev)
+  (prevent-default! ev)
+  (trace-mouse-event ev))
+
+(define (on-mouse-up ev)
+  (prevent-default! ev)
+  (trace-mouse-event ev))
+
+(add-event-listener! canvas "mousemove"
+                     (procedure->external on-mouse-move))
+(add-event-listener! canvas "mousedown"
+                     (procedure->external on-mouse-down))
+(add-event-listener! canvas "mouseup"
+                     (procedure->external on-mouse-up))
+
+;; ;; ---------------------------------
 (values draw* difficulty-set!*)
