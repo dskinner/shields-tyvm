@@ -32,7 +32,18 @@
             draw-image
             set-scale!
             set-transform!
-            set-image-smoothing-enabled!))
+            set-image-smoothing-enabled!
+            begin-path
+            fill
+            arc
+            stroke
+            move-to
+            line-to
+            line-width
+            stroke-style
+            save
+            restore
+            translate))
 
 ;; HTMLCanvasElement
 (define-foreign get-context
@@ -43,30 +54,83 @@
 (define-foreign set-fill-color!
   "canvas" "setFillColor"
   (ref extern) (ref string) -> none)
+
 (define-foreign set-font!
   "canvas" "setFont"
   (ref extern) (ref string) -> none)
+
 (define-foreign set-text-align!
   "canvas" "setTextAlign"
   (ref extern) (ref string) -> none)
+
 (define-foreign clear-rect
   "canvas" "clearRect"
   (ref extern) f64 f64 f64 f64 -> none)
+
 (define-foreign fill-rect
   "canvas" "fillRect"
   (ref extern) f64 f64 f64 f64 -> none)
+
 (define-foreign fill-text
   "canvas" "fillText"
   (ref extern) (ref string) f64 f64 -> none)
+
 (define-foreign draw-image
   "canvas" "drawImage"
   (ref extern) (ref extern) f64 f64 f64 f64 f64 f64 f64 f64 -> none)
+
 (define-foreign set-scale!
   "canvas" "setScale"
   (ref extern) f64 f64 -> none)
+
 (define-foreign set-transform!
   "canvas" "setTransform"
   (ref extern) f64 f64 f64 f64 f64 f64 -> none)
+
 (define-foreign set-image-smoothing-enabled!
   "canvas" "setImageSmoothingEnabled"
   (ref extern) i32 -> none)
+
+(define-foreign begin-path
+  "canvas" "beginPath"
+  (ref extern) -> none)
+
+(define-foreign fill
+  "canvas" "fill"
+  (ref extern) -> none)
+
+(define-foreign stroke
+  "canvas" "stroke"
+  (ref extern) -> none)
+
+(define-foreign arc
+  "canvas" "arc"
+  (ref extern) f32 f32 f32 f32 f32 -> none)
+
+(define-foreign move-to
+  "canvas" "moveTo"
+  (ref extern) f32 f32 -> none)
+
+(define-foreign line-to
+  "canvas" "lineTo"
+  (ref extern) f32 f32 -> none)
+
+(define-foreign line-width
+  "canvas" "lineWidth"
+  (ref extern) f32 -> none)
+
+(define-foreign stroke-style
+  "canvas" "strokeStyle"
+  (ref extern) (ref string) -> none)
+
+(define-foreign save
+  "canvas" "save"
+  (ref extern) -> none)
+
+(define-foreign restore
+  "canvas" "restore"
+  (ref extern) -> none)
+
+(define-foreign translate
+  "canvas" "translate"
+  (ref extern) f32 f32 -> none)

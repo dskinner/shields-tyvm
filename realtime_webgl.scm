@@ -1,11 +1,13 @@
-(import (except (scheme base) bytevector bytevector-append bytevector-copy bytevector-copy! bytevector-length bytevector-u8-ref bytevector-u8-set! bytevector? make-bytevector)
+(import (scheme base)
         (scheme inexact)
         (scheme write)
-        (hoot bytevectors)
-        ;; (only (hoot bytevectors) bytevector-ieee-single-native-set! bytevector-ieee-single-native-ref)
+        (only (hoot bytevectors) bytevector-ieee-single-native-set! bytevector-ieee-single-native-ref)
         (hoot debug)
+        (hoot hashtables)
         (hoot ffi)
-        (only (hoot syntax) case-lambda define*))
+        (only (hoot syntax) case-lambda define*)
+        (dom canvas)
+        (webaudio))
 
 (define-foreign get-element-by-id
   "document" "getElementById"
@@ -51,91 +53,13 @@
   "array" "bufFloat32Array"
   (ref extern) -> (ref extern))
 
-(define-foreign get-memory
-  "mem" "getMemory"
-  -> (ref extern))
-
-(define GL_POINTS 0)
-(define GL_LINES 1)
-(define GL_FLOAT 5126)
-(define GL_COLOR_BUFFER_BIT 16384)
-(define GL_ARRAY_BUFFER 34962)
-(define GL_STATIC_DRAW 35044)
-(define GL_FRAGMENT_SHADER 35632)
-(define GL_VERTEX_SHADER 35633)
-(define GL_COMPILE_STATUS 35713)
- 
-(define-foreign gl-clear-color
-  "webgl" "clearColor"
-  f32 f32 f32 f32 -> (ref null extern))
- 
-(define-foreign gl-clear
-  "webgl" "clear"
-  i32 -> (ref null extern))
-
-(define-foreign gl-create-shader
-  "webgl" "createShader"
-  i32 -> (ref null extern))
-
-(define-foreign gl-shader-source
-  "webgl" "shaderSource"
-  (ref null extern) (ref string) -> none)
-
-(define-foreign gl-compile-shader
-  "webgl" "compileShader"
-  (ref null extern) -> none)
-
-(define-foreign gl-get-shader-parameter
-  "webgl" "getShaderParameter"
-  (ref null extern) i32 -> i32)
-
-(define-foreign gl-create-program
-  "webgl" "createProgram"
-  -> (ref null extern))
-
-(define-foreign gl-attach-shader
-  "webgl" "attachShader"
-  (ref null extern) (ref null extern) -> none)
-
-(define-foreign gl-link-program
-  "webgl" "linkProgram"
-  (ref null extern) -> none)
-
-(define-foreign gl-get-attrib-location
-  "webgl" "getAttribLocation"
-  (ref null extern) (ref string) -> i32)
-
-(define-foreign gl-vertex-attrib-pointer
-  "webgl" "vertexAttribPointer"
-  i32 i32 i32 i32 i32 i32 -> none)
-
-(define-foreign gl-enable-vertex-attrib-array
-  "webgl" "enableVertexAttribArray"
-  i32 -> none)
- 
-(define-foreign gl-create-buffer
-  "webgl" "createBuffer"
-  -> (ref null extern))
-
-(define-foreign gl-bind-buffer
-  "webgl" "bindBuffer"
-  i32 (ref null extern) -> none)
-
-(define-foreign gl-buffer-data
-  "webgl" "bufferData"
-  i32 (ref null extern) i32 -> none)
-
-(define-foreign gl-use-program
-  "webgl" "useProgram"
-  (ref null extern) -> none)
-
-(define-foreign gl-draw-arrays
-  "webgl" "drawArrays"
-  i32 i32 i32 -> none)
-
 (define-foreign request-animation-frame
   "window" "requestAnimationFrame"
   (ref null extern) -> (ref null extern))
+
+(define-foreign timeout
+  "window" "setTimeout"
+  (ref extern) f64 -> i32)
 
 (define-foreign get-float-time-domain-data
   "analyser" "getFloatTimeDomainData"
@@ -145,77 +69,181 @@
   "analyser" "getRMS"
   -> f32)
 
-(define vsrc
-  (string-append "attribute vec4 aVertexPosition;"
-                 "void main() {"
-                 "  gl_Position = aVertexPosition;"
-                 "  gl_PointSize = 3.0;"
-                 "}"))
-
-(define fsrc
-  (string-append "void main() {"
-                 "  gl_FragColor = vec4(1.0, 1.0, 1.0, 1.0);"
-                 "}"))
-
-(define (load-shader type src)
-  (define shader (gl-create-shader type))
-  (gl-shader-source shader src)
-  (gl-compile-shader shader)
-  ;; (display (gl-get-shader-parameter shader GL_COMPILE_STATUS))
-  shader)
-
-(define (init-shaders)
-  (define vertex (load-shader GL_VERTEX_SHADER vsrc))
-  (define fragment (load-shader GL_FRAGMENT_SHADER fsrc))
-  (define program (gl-create-program))
-  (gl-attach-shader program vertex)
-  (gl-attach-shader program fragment)
-  (gl-link-program program)
-  program)
-
-(define program (init-shaders))
-(define vertex-position (gl-get-attrib-location program "aVertexPosition"))
-(define buffer (gl-create-buffer))
-
-;; https://developer.mozilla.org/en-US/docs/WebAssembly/JavaScript_interface/Memory
-;; https://github.com/WebAssembly/design/issues/1231
-
-(define buf2 (make-bytevector (* 4 2048)))
-(define buf (make-array-f32 2048))
-(define bufv (array-f32-buf buf))
-(define mem (get-memory))
-(define val -1.0)
-(do ((i 0 (+ 1 i)))
-    ((= i 2048) buf)
-  (array-f32-set! buf i val)
-  (bytevector-ieee-single-native-set! buf2 (* 4 i) val)
-  (set! val (+ val 0.01)))
-;; (define input-x 0.0)
-;; (define input-y 0.0)
-;; (define input-buffer (gl-create-buffer))
+(define-foreign random
+  "math" "random"
+  -> f32)
 
 (define difficulty 8.0) ;; 7 hard, 8 medium, 9 easy
- 
-(define (draw now)
+
+(define canvas (get-element-by-id "canvas"))
+(define context (get-context canvas "2d"))
+(define canvas-width (element-width canvas))
+(define canvas-height (element-height canvas))
+
+(define (unit-x ev)
+  (/ (offset-x ev) canvas-width))
+(define (unit-y ev)
+  (- 1 (/ (offset-y ev) canvas-height)))
+
+(define param-freq (audio-param-get "freq"))
+(define param-modfreq (audio-param-get "modfreq"))
+(define param-modphase (audio-param-get "modphase"))
+
+(define (param-unit-val p)
+  ;; TODO account for min
+  (/ (audio-param-val p) (audio-param-max p)))
+
+(define (event->param ev)
+  (audio-param-set! param-modphase (* (unit-y ev) (audio-param-max param-modphase)))
+  (audio-param-set! param-modfreq (* (unit-x ev) (audio-param-max param-modfreq))))
+
+(define (trace . objs)
+  (for-each display objs)
+  (newline)
+  (flush-output-port))
+
+(define (trace-mouse-event ev)
+  (trace "[x=" (unit-x ev) "][y=" (unit-y ev) "]"))
+
+(define mouse-down? #f)
+
+(define (audio-context-toggle)
+  (if (string=? "running" (audio-context-state))
+      (audio-context-suspend)
+      (audio-context-resume)))
+
+(define (on-mouse-down ev)
+  (prevent-default! ev)
+  (set! mouse-down? #t)
+  (event->param ev))
+
+(define (on-mouse-move ev)
+  (prevent-default! ev)
+  (when mouse-down?
+    (event->param ev)))
+
+(define (on-mouse-up ev)
+  (prevent-default! ev)
+  (set! mouse-down? #f)
+  (audio-param-set! param-modphase 0.0))
+
+(define-record-type <game>
+  (make-game incoming damage attacks perfects)
+  game?
+  (incoming game-incoming set-game-incoming!)
+  (damage game-damage set-game-damage!)
+  (attacks game-attacks set-game-attacks!)
+  (perfects game-perfects set-game-perfects!))
+
+(define (draw-game game)
+  (set-fill-color! context "#ffffff")
+  (set-font! context "bold 16px monospace")
+  (set-text-align! context "left")
   
+  (fill-text context "Incoming:" 0.0 16.0)
+  (fill-text context (number->string* (game-incoming game)) 88.0 16.0)
+
+  (fill-text context " Attacks:" 0.0 32.0)
+  (fill-text context (number->string* (game-attacks game)) 88.0 32.0) 
+
+  (fill-text context "Perfects:" 0.0 48.0)
+  (fill-text context (number->string* (game-perfects game)) 88.0 48.0)
+
+  (fill-text context "  Damage:" 0.0 64.0)
+  (fill-text context (number->string* (to-fixed (game-damage game) 1)) 88.0 64.0))
+
+(define (rand-f32 s e)
+  (+ s (* (random) (- e s))))
+
+(define (set-param-random! p)
+  (audio-param-set! p (rand-f32 (audio-param-min p) (audio-param-max p))))
+
+(define (generate-attack)
+  (set-param-random! param-freq)
+  (set-param-random! param-modfreq)
+  (set-param-random! param-modphase))
+
+(define current-game (make-game 10 0.0 0 0))
+
+(define (game-loop)
+  (when (= 0 (game-incoming current-game))
+    (set-game-incoming! current-game 10)
+    (set-game-attacks! current-game (+ (game-attacks current-game) 1))
+    (let ((rms (get-rms)))
+      (if (>= rms difficulty)
+          (set-game-damage! current-game (+ (game-damage current-game) (* 1.5 rms)))
+          (if (>= rms 1.0)
+            (set-game-damage! current-game (+ (game-damage current-game) (/ rms 2.0)))
+            (set-game-perfects! current-game (+ (game-perfects current-game) 1))
+            )))
+    (when (< (game-damage current-game) 100.0)
+      (generate-attack)))
+  (set-game-incoming! current-game (- (game-incoming current-game) 1))
+  (if (< (game-damage current-game) 100.0)
+    (timeout game-loop* 1000.0)
+    (audio-context-suspend))
+  )
+(define game-loop* (procedure->external game-loop))
+(timeout game-loop* 1000.0)
+
+(define twopi (* 2 (acos -1)))
+
+(define number->string*
+  (let ((cache (make-eq-hashtable))) ; assuming fixnums only
+    (lambda (x)
+      (or (hashtable-ref cache x)
+          (let ((str (number->string x)))
+            (hashtable-set! cache x str)
+            str)))))
+
+(define (to-fixed f n)
+  (let ((d (expt 10 n)))
+    (/ (truncate (* f d)) d)))
+
+(define (param->string p)
+  (string-append (number->string (to-fixed (audio-param-val p) 3)) "hz"))
+
+(define (norm x) (/ (+ 1.0 x) 2.0))
+
+(define (draw now)
+  (set-fill-color! context "#140c1c")
+  (fill-rect context 0.0 0.0 canvas-width canvas-height)
+
   (let ((data (get-float-time-domain-data))
         (rms (get-rms)))
-    ;; values over 8 would be considered shields down, so full red
+
     (define r (max 0.0 (min 1.0 (/ rms difficulty))))
     (define g (- 1.0 r))
-    (gl-clear-color r g 0.0 1.0)
-    (gl-clear GL_COLOR_BUFFER_BIT)
+    (stroke-style context (string-append "rgb(" (number->string* (truncate (* 255 r))) "," (number->string* (truncate (* 255 g))) ", 0" ")"))
+    
+    (line-width context 1.0)
+    (move-to context 0.0 0.0)
+    (do ((i 0 (+ 1 i)))
+        ((= i 1024) (stroke context))
+      (line-to context
+               (* canvas-width (/ i 1024.0))
+               (* canvas-height (norm (array-f32-ref data i))))))
+   ;;
+  (set-fill-color! context "#ffffff")
+  (begin-path context)
+  (arc context (* (param-unit-val param-modfreq) canvas-width) (- canvas-height (* (param-unit-val param-modphase) canvas-height)) 5.0 0.0 twopi)
+  (fill context)
 
-    (gl-bind-buffer GL_ARRAY_BUFFER buffer)
-    (gl-buffer-data GL_ARRAY_BUFFER data GL_STATIC_DRAW)
-
-    (gl-vertex-attrib-pointer vertex-position 2 GL_FLOAT 0 0 0)
-    (gl-enable-vertex-attrib-array vertex-position)
-
-    (gl-use-program program)
-    ;; TODO fix line wrapping back onto itself with draw index
-    (gl-draw-arrays GL_POINTS 0 1024))
+  ;;
+  (set-font! context "bold 16px monospace")
+  (set-text-align! context "left")
   
+  (fill-text context "PHASE:" 16.0 36.0)
+  (fill-text context (param->string param-modphase) 76.0 36.0)
+  
+  (fill-text context " FREQ:" 16.0 60.0)
+  (fill-text context (param->string param-modfreq) 76.0 60.0)
+
+  (save context)
+  (translate context 500.0 0.0)
+  (draw-game current-game)
+  (restore context)
+ 
   (request-animation-frame draw*))
  
 (define draw* (procedure->external draw))
@@ -226,34 +254,6 @@
 (define difficulty-set!* (procedure->external difficulty-set!))
 
 
-;; ---------------------------------
-
-;; TODO push events to gesture filter
-
-(define canvas (get-element-by-id "glcanvas"))
-(define canvas-w (element-width canvas))
-(define canvas-h (element-height canvas))
-
-(define (trace . objs)
-  (for-each display objs)
-  (newline)
-  (flush-output-port))
-
-(define (trace-mouse-event ev)
-  (trace "[x=" (offset-x ev) "][y=" (offset-y ev) "]"))
-
-(define (on-mouse-down ev)
-  (prevent-default! ev)
-  (trace-mouse-event ev))
-
-(define (on-mouse-move ev)
-  (prevent-default! ev)
-  (trace-mouse-event ev))
-
-(define (on-mouse-up ev)
-  (prevent-default! ev)
-  (trace-mouse-event ev))
-
 (add-event-listener! canvas "mousemove"
                      (procedure->external on-mouse-move))
 (add-event-listener! canvas "mousedown"
@@ -261,5 +261,7 @@
 (add-event-listener! canvas "mouseup"
                      (procedure->external on-mouse-up))
 
-;; ;; ---------------------------------
+(add-event-listener! (get-element-by-id "toggleaudio") "click"
+                     (procedure->external (lambda (ev) (audio-context-toggle))))
+
 (values draw* difficulty-set!*)

@@ -743,6 +743,9 @@ function repr(obj) {
 class AudioSink extends AudioWorkletProcessor {
     #scm;
 
+	bin = new Uint8Array(4*128);
+	f32s = new Float32Array(this.bin.buffer);
+
     static get parameterDescriptors() {
         return [
             {
@@ -776,6 +779,7 @@ class AudioSink extends AudioWorkletProcessor {
         }
     }
 
+
     process(inputs, outputs, parameters) {
         if (typeof this.#scm === 'undefined') {
             return true;
@@ -783,24 +787,15 @@ class AudioSink extends AudioWorkletProcessor {
 
         // TODO assumes [128]f32 everywhere
 		// TODO just passes first value of param array currently
-        let buf = this.#scm[0](parameters.freq[0], parameters.modfreq[0], parameters.modphase[0])[0];
-
-        // copy data
-        let n = buf.reflector.bytevector_length(buf);
-        let bin = new Uint8Array(n);
-        for (let i = 0; i < n; i++) {
-            bin[i] = buf.reflector.bytevector_ref(buf, i);
+        const buf = this.#scm[0](parameters.freq[0], parameters.modfreq[0], parameters.modphase[0])[0];
+        for (let i = 0; i < this.bin.length; i++) {
+            this.bin[i] = buf.reflector.bytevector_ref(buf, i);
         }
-        // project values
-        let f32s = new Float32Array(bin.buffer);
 
         // TODO currently mono channel in scm but copy to all for now
         const output = outputs[0];
         for (let channel = 0; channel < output.length; ++channel) {
-            const outputChannel = output[channel];
-            for (let i = 0; i < outputChannel.length; ++i) {
-                outputChannel[i] = f32s[i];
-            }
+			output[channel].set(this.f32s);
         }
 
         return true;
