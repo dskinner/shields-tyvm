@@ -73,7 +73,7 @@
   "math" "random"
   -> f32)
 
-(define difficulty 8.0) ;; 7 hard, 8 medium, 9 easy
+(define difficulty 10.0)
 
 (define canvas (get-element-by-id "canvas"))
 (define context (get-context canvas "2d"))
@@ -93,9 +93,10 @@
   ;; TODO account for min
   (/ (audio-param-val p) (audio-param-max p)))
 
-(define (event->param ev)
-  (audio-param-set! param-modphase (* (unit-y ev) (audio-param-max param-modphase)))
-  (audio-param-set! param-modfreq (* (unit-x ev) (audio-param-max param-modfreq))))
+
+;; (define (event->param ev)
+;;   (audio-param-set! param-modphase (* (unit-y ev) (audio-param-max param-modphase)))
+;;   (audio-param-set! param-modfreq (* (unit-x ev) (audio-param-max param-modfreq))))
 
 (define (trace . objs)
   (for-each display objs)
@@ -105,6 +106,9 @@
 (define (trace-mouse-event ev)
   (trace "[x=" (unit-x ev) "][y=" (unit-y ev) "]"))
 
+;; (define last-mouse-event #f)
+(define want-modphase (audio-param-val param-modphase))
+(define want-modfreq (audio-param-val param-modfreq))
 (define mouse-down? #f)
 
 (define (audio-context-toggle)
@@ -115,17 +119,50 @@
 (define (on-mouse-down ev)
   (prevent-default! ev)
   (set! mouse-down? #t)
-  (event->param ev))
+  (handle-mouse-event ev))
 
 (define (on-mouse-move ev)
   (prevent-default! ev)
   (when mouse-down?
-    (event->param ev)))
+    (handle-mouse-event ev)))
 
 (define (on-mouse-up ev)
   (prevent-default! ev)
   (set! mouse-down? #f)
-  (audio-param-set! param-modphase 0.0))
+  ;; (when (or (= difficulty 10) (= difficulty 8)))
+  (set! want-modphase 0.0)
+  ;; (audio-param-set! param-modphase 0.0) ;; TODO move to handler
+  )
+
+(define (handle-mouse-event ev)
+  (set! want-modphase (* (unit-y ev) (audio-param-max param-modphase)))
+  (set! want-modfreq (* (unit-x ev) (audio-param-max param-modfreq))))
+
+(define (lt-eps eps x y)
+  (< eps (abs (- x y))))
+
+(define (handle-wants)
+  (let ((have-modphase (audio-param-val param-modphase))
+        (have-modfreq (audio-param-val param-modfreq)))
+
+    (when (or (= difficulty 10) (= difficulty 8))
+      (audio-param-set! param-modphase want-modphase)
+      (audio-param-set! param-modfreq want-modfreq))
+
+    (when (= difficulty 4)
+      (if (lt-eps 40.0 want-modfreq have-modfreq)
+        (if (< want-modfreq have-modfreq)
+            (audio-param-set! param-modfreq (- have-modfreq 40.0))
+            (audio-param-set! param-modfreq (+ have-modfreq 40.0)))
+        (audio-param-set! param-modfreq want-modfreq))
+      
+      (if (lt-eps 0.01 want-modphase have-modphase)
+        (if (< want-modphase have-modphase)
+            (audio-param-set! param-modphase (- have-modphase 0.01))
+            (audio-param-set! param-modphase (+ have-modphase 0.01)))
+        (audio-param-set! param-modphase want-modphase))
+      )
+    ))
 
 (define-record-type <game>
   (make-game incoming damage attacks perfects)
@@ -181,11 +218,16 @@
 (define (generate-attack)
   (set-param-random! param-freq)
   (set-param-random! param-modfreq)
-  (set-param-random! param-modphase))
+  (set-param-random! param-modphase)
+  (set! want-modfreq (audio-param-val param-modfreq))
+  (set! want-modphase (audio-param-val param-modphase)))
 
 (define current-game (make-game 10 0.0 0 0))
 
 (define (game-loop)
+  ;; (when last-mouse-event
+  ;;   (handle-last-mouse-event))
+  
   (when (= 0 (game-incoming current-game))
     (set-game-incoming! current-game 10)
     (set-game-attacks! current-game (+ (game-attacks current-game) 1))
@@ -193,9 +235,9 @@
       (if (>= rms difficulty)
           (set-game-damage! current-game (+ (game-damage current-game) (* 1.5 rms)))
           (if (>= rms 1.0)
-            (set-game-damage! current-game (+ (game-damage current-game) (/ rms 2.0)))
-            (set-game-perfects! current-game (+ (game-perfects current-game) 1))
-            )))
+              (set-game-damage! current-game (+ (game-damage current-game) (/ rms 2.0)))
+              (set-game-perfects! current-game (+ (game-perfects current-game) 1))
+              )))
     (when (< (game-damage current-game) 100.0)
       (generate-attack)))
   (set-game-incoming! current-game (- (game-incoming current-game) 1))
@@ -246,6 +288,9 @@
   (restore context))
 
 (define (draw now)
+  
+  (handle-wants)
+  
   (set-fill-color! context "#140c1c")
   (fill-rect context 0.0 0.0 canvas-width canvas-height)
 

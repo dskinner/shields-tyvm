@@ -1,5 +1,5 @@
 async function gameInit() {
-	let difficulty = 8.0;
+	let difficulty = 10.0;
 
 	const fftSize = 1024;
 	const audioContext = new AudioContext({sampleRate: 8000});
