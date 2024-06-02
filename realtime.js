@@ -1,24 +1,27 @@
+let audioContext;
+let audioSink;
+let modules = {};
+
 async function gameInit() {
 	let difficulty = 10.0;
 
 	const fftSize = 1024;
-	const audioContext = new AudioContext({sampleRate: 8000});
+	audioContext = new AudioContext({sampleRate: 8000});
 	const analyser = audioContext.createAnalyser();
 	analyser.fftSize = fftSize;
 	const analyserData = new Float32Array(fftSize);
 
-    let modules = {};
-    modules["js-runtime/wtf8.wasm"] = await WebAssembly.compileStreaming(fetch("js-runtime/wtf8.wasm"));
-    modules["js-runtime/reflect.wasm"] = await WebAssembly.compileStreaming(fetch("js-runtime/reflect.wasm"));
-    modules["realtime_audio.wasm"] = await WebAssembly.compileStreaming(fetch("realtime_audio.wasm"));
+	modules["js-runtime/wtf8.wasm"] = await WebAssembly.compileStreaming(fetch("js-runtime/wtf8.wasm"));
+	modules["js-runtime/reflect.wasm"] = await WebAssembly.compileStreaming(fetch("js-runtime/reflect.wasm"));
+	modules["realtime_audio.wasm"] = await WebAssembly.compileStreaming(fetch("realtime_audio.wasm"));
 
-    await audioContext.audioWorklet.addModule('realtime_worklet.js');
-    const audioSink = new AudioWorkletNode(audioContext, 'audio-sink');
-    audioSink.port.postMessage(modules);
+	await audioContext.audioWorklet.addModule('realtime_worklet.js');
+	audioSink = new AudioWorkletNode(audioContext, 'audio-sink');
+	audioSink.port.postMessage(modules);
 	audioSink.connect(analyser);
-    analyser.connect(audioContext.destination);
+	analyser.connect(audioContext.destination);
 
-    const scm = await Scheme.load_main("realtime_webgl.wasm", {}, {
+	const scm = await Scheme.load_main("realtime_webgl.wasm", {}, {
 		webaudio: {
 			audioParamGet: (name) => audioSink.parameters.get(name),
 			audioParamSet: (param, value) => param.setValueAtTime(value, audioContext.currentTime),
@@ -29,10 +32,10 @@ async function gameInit() {
 			audioContextSuspend: () => audioContext.suspend(),
 			audioContextResume: () => audioContext.resume()
 		},
-        window: {
-            requestAnimationFrame: requestAnimationFrame,
+		window: {
+			requestAnimationFrame: requestAnimationFrame,
 			setTimeout: setTimeout
-        },
+		},
 		document: {
 			getElementById: (id) => document.getElementById(id)
 		},
@@ -79,11 +82,11 @@ async function gameInit() {
 		math: {
 			random: Math.random
 		},
-        analyser: {
-            getFloatTimeDomainData() {
-                analyser.getFloatTimeDomainData(analyserData);
+		analyser: {
+			getFloatTimeDomainData() {
+				analyser.getFloatTimeDomainData(analyserData);
 				return analyserData;
-            },
+			},
 			getRMS() {
 				let m = 0;
 				for (let i = 0; i < fftSize; i++) {
@@ -93,8 +96,8 @@ async function gameInit() {
 				const rms = Math.sqrt(m);
 				return rms;
 			}
-        }
-    });
+		}
+	});
 
 	addEventListener("keydown", function(ev) {
 		if (ev.keyCode == 32) {
@@ -107,14 +110,14 @@ async function gameInit() {
 	});
 
 
-	scm[1](difficulty);
+	scm[0](difficulty);
 
 	for (const inp of document.querySelectorAll("input[name=difficulty]")) {
 		inp.onchange = function() {
 			const x = parseFloat(this.value);
 			console.log(`setting difficulty to ${x}`);
 			difficulty = x;
-			scm[1](difficulty);
+			scm[0](difficulty);
 		}
 	}
 	
@@ -143,4 +146,12 @@ async function gameInit() {
 
 }
 
-window.addEventListener("load", gameInit);
+window.addEventListener("load", function() {
+	let initOnce = false;
+	document.querySelector("#initgame").onclick = function() {
+		if (!initOnce) {
+			initOnce = true;
+			gameInit();
+		}
+	};
+});

@@ -741,65 +741,69 @@ function repr(obj) {
 // ****************************************************************************
 
 class AudioSink extends AudioWorkletProcessor {
-    #scm;
-
+	scm;
 	bin = new Uint8Array(4*128);
 	f32s = new Float32Array(this.bin.buffer);
 
-    static get parameterDescriptors() {
-        return [
-            {
-                name: "freq",
-                defaultValue: 229.0,
-                minValue: 200.0,
-                maxValue: 4000.0
-            },
-            {
-                name: "modfreq",
-                defaultValue: 313.0,
-                minValue: 60.0,
-                maxValue: 4000.0
-            },
+	static get parameterDescriptors() {
+		return [
+			{
+				name: "freq",
+				defaultValue: 229.0,
+				minValue: 200.0,
+				maxValue: 4000.0
+			},
+			{
+				name: "modfreq",
+				defaultValue: 313.0,
+				minValue: 60.0,
+				maxValue: 4000.0
+			},
 			{
 				name: "modphase",
 				defaultValue: 0.0,
 				minValue: 0.0,
 				maxValue: 0.5
 			}
-        ];
-    }
+		];
+	}
 
 
-    constructor(...args) {
-        super(...args);
-        this.port.onmessage = async (e) => {
-            module_map = e.data;
-            this.#scm = await Scheme.load_main("realtime_audio.wasm");
-			this.#scm[1](sampleRate);
-        }
-    }
+	constructor(...args) {
+		super(...args);
+		this.port.onmessage = (e) => {
+			module_map = e.data;
+			Scheme.load_main("realtime_audio.wasm").then((result) => {
+				result[1](sampleRate);
+				this.scm = result;
+			});
+		}
+		this.port.onmessageerror = (e) => {
+			console.error("worklet message error:", e);
+		}
+	}
 
 
-    process(inputs, outputs, parameters) {
-        if (typeof this.#scm === 'undefined') {
-            return true;
-        }
+	process(inputs, outputs, parameters) {
+		if (typeof this.scm === 'undefined') {
+			return true;
+		}
 
-        // TODO assumes [128]f32 everywhere
+		// TODO assumes [128]f32 everywhere
 		// TODO just passes first value of param array currently
-        const buf = this.#scm[0](parameters.freq[0], parameters.modfreq[0], parameters.modphase[0])[0];
-        for (let i = 0; i < this.bin.length; i++) {
-            this.bin[i] = buf.reflector.bytevector_ref(buf, i);
-        }
+		const buf = this.scm[0](parameters.freq[0], parameters.modfreq[0], parameters.modphase[0])[0];
+		for (let i = 0; i < this.bin.length; i++) {
+			this.bin[i] = buf.reflector.bytevector_ref(buf, i);
+		}
 
-        // TODO currently mono channel in scm but copy to all for now
-        const output = outputs[0];
-        for (let channel = 0; channel < output.length; ++channel) {
+		// TODO currently mono channel in scm but copy to all for now
+		const output = outputs[0];
+		for (let channel = 0; channel < output.length; ++channel) {
 			output[channel].set(this.f32s);
-        }
+		}
 
-        return true;
-    }
+		return true;
+	}
 }
 
 registerProcessor('audio-sink', AudioSink);

@@ -93,11 +93,6 @@
   ;; TODO account for min
   (/ (audio-param-val p) (audio-param-max p)))
 
-
-;; (define (event->param ev)
-;;   (audio-param-set! param-modphase (* (unit-y ev) (audio-param-max param-modphase)))
-;;   (audio-param-set! param-modfreq (* (unit-x ev) (audio-param-max param-modfreq))))
-
 (define (trace . objs)
   (for-each display objs)
   (newline)
@@ -106,7 +101,6 @@
 (define (trace-mouse-event ev)
   (trace "[x=" (unit-x ev) "][y=" (unit-y ev) "]"))
 
-;; (define last-mouse-event #f)
 (define want-modphase (audio-param-val param-modphase))
 (define want-modfreq (audio-param-val param-modfreq))
 (define mouse-down? #f)
@@ -129,10 +123,7 @@
 (define (on-mouse-up ev)
   (prevent-default! ev)
   (set! mouse-down? #f)
-  ;; (when (or (= difficulty 10) (= difficulty 8)))
-  (set! want-modphase 0.0)
-  ;; (audio-param-set! param-modphase 0.0) ;; TODO move to handler
-  )
+  (set! want-modphase 0.0))
 
 (define (handle-mouse-event ev)
   (set! want-modphase (* (unit-y ev) (audio-param-max param-modphase)))
@@ -225,9 +216,6 @@
 (define current-game (make-game 10 0.0 0 0))
 
 (define (game-loop)
-  ;; (when last-mouse-event
-  ;;   (handle-last-mouse-event))
-  
   (when (= 0 (game-incoming current-game))
     (set-game-incoming! current-game 10)
     (set-game-attacks! current-game (+ (game-attacks current-game) 1))
@@ -272,11 +260,15 @@
 
   (set-font! context "bold 16px monospace")
   (set-text-align! context "left")
-  (translate context 16.0 16.0)
+
   (set-fill-color! context "#999")
+
+  (translate context 16.0 16.0)
   (fill-text context " BASE:" 0.0 0.0)
   (fill-text context (param->string param-freq) 58.0 0.0)
+
   (set-fill-color! context "#ffffff")
+
   (translate context 0.0 16.0)
   (fill-text context "PHASE:" 0.0 0.0)
   (fill-text context (param->string param-modphase) 58.0 0.0)
@@ -287,7 +279,7 @@
   
   (restore context))
 
-(define (draw now)
+(define (main-loop now)
   
   (handle-wants)
   
@@ -308,6 +300,7 @@
       (line-to context
                (* canvas-width (/ i 1024.0))
                (* canvas-height (norm (array-f32-ref data i))))))
+
   ;;
   (set-fill-color! context "#ffffff")
   (begin-path context)
@@ -318,15 +311,14 @@
   (draw-signal-info)
   (draw-game current-game)
  
-  (request-animation-frame draw*))
+  (request-animation-frame main-loop*))
  
-(define draw* (procedure->external draw))
-(request-animation-frame draw*)
+(define main-loop* (procedure->external main-loop))
+(request-animation-frame main-loop*)
 
 (define (difficulty-set! x)
   (set! difficulty x))
 (define difficulty-set!* (procedure->external difficulty-set!))
-
 
 (add-event-listener! canvas "mousemove"
                      (procedure->external on-mouse-move))
@@ -338,4 +330,4 @@
 (add-event-listener! (get-element-by-id "toggleaudio") "click"
                      (procedure->external (lambda (ev) (audio-context-toggle))))
 
-(values draw* difficulty-set!*)
+(values difficulty-set!*)

@@ -1,2 +1,4 @@
-*.wasm
+game.wasm
+realtime_audio.wasm
+realtime_webgl.wasm
 *.zip
