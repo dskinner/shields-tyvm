@@ -135,22 +135,42 @@
   (attacks game-attacks set-game-attacks!)
   (perfects game-perfects set-game-perfects!))
 
+(define (draw-game-incoming game)
+  (save context)
+  (set-fill-color! context "#ffffff")
+  (set-text-align! context "center")
+  (set-font! context "bold 16px monospace")
+
+  (translate context 300.0 16.0)
+
+  (fill-text context "Attack in" 0.0 0.0)
+  (set-font! context "bold 36px monospace")
+  (fill-text context (number->string* (game-incoming game)) 0.0 36.0)
+
+  (restore context))
+
 (define (draw-game game)
+  (save context)
+
+  (draw-game-incoming game)
+  
   (set-fill-color! context "#ffffff")
   (set-font! context "bold 16px monospace")
   (set-text-align! context "left")
+
+  (translate context 484.0 16.0)
+
+  (fill-text context "Survived:" 0.0 0.0)
+  (fill-text context (number->string* (game-attacks game)) 88.0 0.0) 
+
+  (translate context 0.0 16.0)
+  (fill-text context "Perfects:" 0.0 0.0)
+  (fill-text context (number->string* (game-perfects game)) 88.0 0.0)
+
+  (translate context 0.0 16.0)
+  (fill-text context (string-append "  Damage:" (number->string* (to-fixed (game-damage game) 1)) "%") 0.0 0.0)
   
-  (fill-text context "Incoming:" 0.0 16.0)
-  (fill-text context (number->string* (game-incoming game)) 88.0 16.0)
-
-  (fill-text context " Attacks:" 0.0 32.0)
-  (fill-text context (number->string* (game-attacks game)) 88.0 32.0) 
-
-  (fill-text context "Perfects:" 0.0 48.0)
-  (fill-text context (number->string* (game-perfects game)) 88.0 48.0)
-
-  (fill-text context "  Damage:" 0.0 64.0)
-  (fill-text context (number->string* (to-fixed (game-damage game) 1)) 88.0 64.0))
+  (restore context))
 
 (define (rand-f32 s e)
   (+ s (* (random) (- e s))))
@@ -205,6 +225,26 @@
 
 (define (norm x) (/ (+ 1.0 x) 2.0))
 
+(define (draw-signal-info)
+  (save context)
+
+  (set-font! context "bold 16px monospace")
+  (set-text-align! context "left")
+  (translate context 16.0 16.0)
+  (set-fill-color! context "#999")
+  (fill-text context " BASE:" 0.0 0.0)
+  (fill-text context (param->string param-freq) 58.0 0.0)
+  (set-fill-color! context "#ffffff")
+  (translate context 0.0 16.0)
+  (fill-text context "PHASE:" 0.0 0.0)
+  (fill-text context (param->string param-modphase) 58.0 0.0)
+
+  (translate context 0.0 16.0)
+  (fill-text context " FREQ:" 0.0 0.0)
+  (fill-text context (param->string param-modfreq) 58.0 0.0)
+  
+  (restore context))
+
 (define (draw now)
   (set-fill-color! context "#140c1c")
   (fill-rect context 0.0 0.0 canvas-width canvas-height)
@@ -217,32 +257,21 @@
     (stroke-style context (string-append "rgb(" (number->string* (truncate (* 255 r))) "," (number->string* (truncate (* 255 g))) ", 0" ")"))
     
     (line-width context 1.0)
-    (move-to context 0.0 0.0)
+    (move-to context 0.0 0.0) ;; TODO
     (do ((i 0 (+ 1 i)))
         ((= i 1024) (stroke context))
       (line-to context
                (* canvas-width (/ i 1024.0))
                (* canvas-height (norm (array-f32-ref data i))))))
-   ;;
+  ;;
   (set-fill-color! context "#ffffff")
   (begin-path context)
   (arc context (* (param-unit-val param-modfreq) canvas-width) (- canvas-height (* (param-unit-val param-modphase) canvas-height)) 5.0 0.0 twopi)
   (fill context)
 
   ;;
-  (set-font! context "bold 16px monospace")
-  (set-text-align! context "left")
-  
-  (fill-text context "PHASE:" 16.0 36.0)
-  (fill-text context (param->string param-modphase) 76.0 36.0)
-  
-  (fill-text context " FREQ:" 16.0 60.0)
-  (fill-text context (param->string param-modfreq) 76.0 60.0)
-
-  (save context)
-  (translate context 500.0 0.0)
+  (draw-signal-info)
   (draw-game current-game)
-  (restore context)
  
   (request-animation-frame draw*))
  
