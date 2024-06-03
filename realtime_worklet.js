@@ -771,8 +771,11 @@ class AudioSink extends AudioWorkletProcessor {
 
 	constructor(...args) {
 		super(...args);
-		this.port.onmessage = (e) => {
-			module_map = e.data;
+		this.port.onmessage = async (e) => {
+			// BUG module_map = e.data;
+			for (const [key, value] of Object.entries(e.data)) {
+				module_map[key] = await WebAssembly.compile(value);
+			}
 			Scheme.load_main("realtime_audio.wasm").then((result) => {
 				result[1](sampleRate);
 				this.scm = result;

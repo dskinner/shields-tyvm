@@ -3,17 +3,19 @@ let audioSink;
 let modules = {};
 
 async function gameInit() {
-	let difficulty = 10.0;
-
 	const fftSize = 1024;
 	audioContext = new AudioContext({sampleRate: 8000});
 	const analyser = audioContext.createAnalyser();
 	analyser.fftSize = fftSize;
 	const analyserData = new Float32Array(fftSize);
 
-	modules["js-runtime/wtf8.wasm"] = await WebAssembly.compileStreaming(fetch("js-runtime/wtf8.wasm"));
-	modules["js-runtime/reflect.wasm"] = await WebAssembly.compileStreaming(fetch("js-runtime/reflect.wasm"));
-	modules["realtime_audio.wasm"] = await WebAssembly.compileStreaming(fetch("realtime_audio.wasm"));
+	// modules["js-runtime/wtf8.wasm"] = await WebAssembly.compileStreaming(fetch("js-runtime/wtf8.wasm"));
+	// modules["js-runtime/reflect.wasm"] = await WebAssembly.compileStreaming(fetch("js-runtime/reflect.wasm"));
+	// modules["realtime_audio.wasm"] = await WebAssembly.compileStreaming(fetch("realtime_audio.wasm"));
+	// BUG linux/chromium failed to serialize wasm module on postMessage; instead, post ArrayBuffer and compile in worklet.
+	modules["js-runtime/wtf8.wasm"] = await (await fetch("js-runtime/wtf8.wasm")).arrayBuffer();
+	modules["js-runtime/reflect.wasm"] = await (await fetch("js-runtime/reflect.wasm")).arrayBuffer();
+	modules["realtime_audio.wasm"] = await (await fetch("realtime_audio.wasm")).arrayBuffer();
 
 	await audioContext.audioWorklet.addModule('realtime_worklet.js');
 	audioSink = new AudioWorkletNode(audioContext, 'audio-sink');
@@ -99,25 +101,11 @@ async function gameInit() {
 		}
 	});
 
-	addEventListener("keydown", function(ev) {
-		if (ev.keyCode == 32) {
-			setAudioParam(modphase, 0.0);
-		}
-
-		if (ev.keyCode == 82) {
-			generateAttack();
-		}
-	});
-
-
-	scm[0](difficulty);
-
 	for (const inp of document.querySelectorAll("input[name=difficulty]")) {
 		inp.onchange = function() {
 			const x = parseFloat(this.value);
 			console.log(`setting difficulty to ${x}`);
-			difficulty = x;
-			scm[0](difficulty);
+			scm[0](x);
 		}
 	}
 	
@@ -147,11 +135,21 @@ async function gameInit() {
 }
 
 window.addEventListener("load", function() {
+	// NOTE browsers generally require user interaction to start audio context
 	let initOnce = false;
-	document.querySelector("#initgame").onclick = function() {
+	const canvas = document.querySelector("#canvas");
+	canvas.onclick = function() {
 		if (!initOnce) {
 			initOnce = true;
 			gameInit();
 		}
+		canvas.onclick = null;
 	};
+	const ctx = canvas.getContext("2d");
+	ctx.fillStyle = "#000";
+	ctx.fillRect(0, 0, canvas.width, canvas.height);
+	ctx.font = "bold 48px monospace";
+	ctx.textAlign = "center";
+	ctx.fillStyle = "#fff";
+	ctx.fillText("CLICK TO START", canvas.width/2, canvas.height/2);
 });

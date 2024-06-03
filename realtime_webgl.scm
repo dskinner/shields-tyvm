@@ -204,14 +204,14 @@
   (+ s (* (random) (- e s))))
 
 (define (set-param-random! p)
-  (audio-param-set! p (rand-f32 (audio-param-min p) (audio-param-max p))))
+  (let ((x (rand-f32 (audio-param-min p) (audio-param-max p))))
+    (audio-param-set! p x)
+    x))
 
 (define (generate-attack)
   (set-param-random! param-freq)
-  (set-param-random! param-modfreq)
-  (set-param-random! param-modphase)
-  (set! want-modfreq (audio-param-val param-modfreq))
-  (set! want-modphase (audio-param-val param-modphase)))
+  (set! want-modfreq (set-param-random! param-modfreq))
+  (set! want-modphase (set-param-random! param-modphase)))
 
 (define current-game (make-game 10 0.0 0 0))
 
@@ -297,9 +297,13 @@
     (move-to context 0.0 0.0) ;; TODO
     (do ((i 0 (+ 1 i)))
         ((= i 1024) (stroke context))
-      (line-to context
-               (* canvas-width (/ i 1024.0))
-               (* canvas-height (norm (array-f32-ref data i))))))
+      (if (= 0 i)
+          (move-to context
+                   (* canvas-width (/ i 1024.0))
+                   (* canvas-height (norm (array-f32-ref data i))))
+          (line-to context
+                   (* canvas-width (/ i 1024.0))
+                   (* canvas-height (norm (array-f32-ref data i)))))))
 
   ;;
   (set-fill-color! context "#ffffff")
