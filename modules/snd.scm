@@ -1,9 +1,19 @@
-(import (scheme base)
-        (scheme inexact)
-        (only (hoot bytevectors) bytevector-ieee-single-native-set!)
-        (hoot debug)
-        (hoot ffi)
-        (only (hoot syntax) case-lambda define* lambda*))
+(define-module (snd)
+  #:pure
+  #:use-module (scheme base)
+  #:use-module (scheme inexact)
+  #:use-module ((hoot syntax)
+                #:select
+                (case-lambda
+                 define*
+                 lambda*))
+  #:export (decibel->amp
+            default-buffer-length
+            set-default-buffer-length!
+            set-default-sample-rate!
+            discrete-sine
+            mixer
+            oscil))
 
 (define (hertz->angular hz)
   (* twopi hz))
@@ -13,8 +23,13 @@
   (expt 10 (/ dB 20)))
 
 (define twopi (* 2 (acos -1)))
+
 (define default-sample-rate 0) ;; set from worklet
+(define (set-default-sample-rate! sr) (set! default-sample-rate sr))
+
 (define default-buffer-length 128) ;; webaudio api default
+(define (set-default-buffer-length! n) (set! default-buffer-length n))
+
 ;; (define default-amp-factor (decibel->amp -10))
 
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; signal.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;

@@ -1,123 +1,42 @@
 (import (scheme base)
-        (scheme inexact)
         (only (hoot bytevectors) bytevector-ieee-single-native-set!)
-        (hoot debug)
         (hoot ffi)
-        (only (hoot syntax) case-lambda define* lambda*))
+        (snd))
 
-(define (hertz->angular hz)
-  (* twopi hz))
-(define (hertz->angular/normalize hz sr)
-  (/ (hertz->angular hz) sr))
-(define (decibel->amp dB)
-  (expt 10 (/ dB 20)))
+;; below is oscillator with a frequency modulator; this signal is then duplicated; the duplicate signal has a phase modulator;
+;; these are placed into additive mixer; signals can cancel each other out when duplicate has phase offset.
+;;
+;; basically, this is a noise-cancelling game.
+;;
+;; the frequency modulator is mostly a source of artificial complexity; this with choice of game controls can vary difficulty
+;; from nearly-impossible to trivial.
 
-(define twopi (* 2 (acos -1)))
-(define default-sample-rate 0) ;; set from worklet
-(define default-buffer-length 128) ;; webaudio api default
-;; (define default-amp-factor (decibel->amp -10))
+(define sine (discrete-sine))
 
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; signal.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+(define osc-mod-phase (oscil sine))
+(define osc-mod-freq (oscil sine))
+(define osc-shield-0 (oscil sine #:mod-freq osc-mod-freq #:amp (decibel->amp -10)))
+(define osc-shield-1 (oscil sine #:mod-freq osc-mod-freq #:amp (decibel->amp -10) #:mod-phase osc-mod-phase))
+(define mix (mixer (osc-shield-0) (osc-shield-1)))
 
-(define default-table-size 4096)
+(define time-code 0)
+(define buf (make-bytevector (* 4 default-buffer-length)))
 
-(define (discrete-interp sig t)
-  "Uses the fractional component of t to return an interpolated sample."
-  (when (< t 0)
-    (set! t (- t)))
-  (set! t (- t (truncate t)))
-  (set! t (* t (vector-length sig)))
-  (define frac (- t (truncate t)))
-  (define i (exact (truncate (- t frac))))
-  (if (= 0 frac)
-      (vector-ref sig i)
-      (let ((j (+ 1 i)))
-        (when (= j (vector-length sig))
-          (set! j 0))
-        (+ (* (- 1 frac) (vector-ref sig i)) (* frac (vector-ref sig j))))))
+(define (prepare freq mod-freq mod-phase)
+  (set! time-code (+ 1 time-code))
 
-(define (discrete-at sig t)
-  "Uses the fractional component of t to return the sample at the truncated index."
-  (when (< t 0)
-    (set! t (- t)))
-  (set! t (- t (truncate t)))
-  (set! t (* t (vector-length sig)))
-  (vector-ref sig (exact (truncate t))))
+  ;; TODO sort and prepare graph
+  (osc-mod-phase time-code mod-phase)
+  (osc-mod-freq time-code mod-freq)
+  (osc-shield-0 time-code freq)
+  (osc-shield-1 time-code freq)
 
-(define (discrete-index sig i)
-  (vector-ref sig (modulo i (- (vector-length sig) 1))))
+  (define out (mix))
+  (do ((i 0 (+ 1 i)))
+      ((= i (vector-length out)) buf)
+    (bytevector-ieee-single-native-set! buf (* 4 i) (vector-ref out i))))
 
-(define (discrete-sample sig src interval phase)
-  "Reads values from src at phase by interval and returns next phase to sample."
-  (let lp ((i 0))
-    (if (< i (vector-length sig))
-        (begin
-          (vector-set! sig i (src phase))
-          (set! phase (+ phase interval))
-          (lp (+ 1 i)))
-        phase)))
-
-(define (continuous-sine t)
-  (sin (* twopi t)))
-
-(define (discrete-sine)
-  (define sig (make-vector default-table-size))
-  (discrete-sample sig continuous-sine (/ 1 default-table-size) 0)
-  sig)
-
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; oscil.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define* (oscil in #:key (freq 440) (mod-freq #f) (phase 0) (mod-phase #f) (amp 1) (mod-amp #f))
-  (let ((out (make-vector default-buffer-length)))
-    (case-lambda
-      (() out)
-      ((tc newfreq)
-       (when newfreq
-         (set! freq newfreq))
-       (define frame (* (- tc 1) (vector-length out)))
-       (define nfreq (/ freq default-sample-rate))
-       (do ((i 0 (+ 1 i))
-            (interval nfreq nfreq)
-            (offset 0 0)
-            (ampfac amp amp))
-           ((= i (vector-length out)) out)
-         (when mod-freq
-           (set! interval (* interval (discrete-index (mod-freq) (+ frame i)))))
-         (when mod-phase
-           (set! offset (discrete-index (mod-phase) (+ frame i))))
-         (when mod-amp
-           (set! ampfac (* ampfac (discrete-index (mod-amp) (+ frame i)))))
-         (vector-set! out i (* ampfac (discrete-at in (+ phase offset))))
-         (set! phase (+ phase interval)))))))
-
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; mixer.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-(define (sum l i)
-  (if (null? l)
-      0
-      (+ (vector-ref (car l) i) (sum (cdr l) i))))
-
-;; additive mixer
-(define (mixer . ins)
-  (let ((out (make-vector default-buffer-length)))
-    (lambda ()
-      (do ((i 0 (+ 1 i)))
-          ((= i (vector-length out)) out)
-        (vector-set! out i (sum ins i))))))
-
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; filter.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;    ;; TODO low-pass
-
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; delay.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;    ;; TODO tap
-
-;;    ;; TODO comb
-   
-;; ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;; main.scm ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-
-;;    ;; TODO create graph
+(values (procedure->external prepare) (procedure->external set-default-sample-rate!))
 
 ;; possible shield starting configurations as main-freq:mod-freq
 ;; 176:748
@@ -167,43 +86,9 @@
 ;;              (oscil sine
 ;;                     #:freq 240.2)))
 
-
 ;; 400:375
 ;; 400:1000
 
 ;; 440: 572
 ;; 440: 550
 ;; 220: 550 sounds like a warning
-
-(define sine (discrete-sine))
-
-(define osc-mod-phase (oscil sine))
-(define osc-mod-freq (oscil sine))
-(define osc-shield-0 (oscil sine #:mod-freq osc-mod-freq #:amp (decibel->amp -10)))
-(define osc-shield-1 (oscil sine #:mod-freq osc-mod-freq #:amp (decibel->amp -10) #:mod-phase osc-mod-phase))
-(define mix (mixer (osc-shield-0) (osc-shield-1)))
-
-(define time-code 0)
-(define buf (make-bytevector (* 4 default-buffer-length)))
-
-(define (prepare freq mod-freq mod-phase)
-  (set! time-code (+ 1 time-code))
-
-  ;; TODO sort and prepare graph
-  (osc-mod-phase time-code mod-phase)
-  (osc-mod-freq time-code mod-freq)
-  (osc-shield-0 time-code freq)
-  (osc-shield-1 time-code freq)
-
-  ;; (define out (osc-sh0))
-  (define out (mix))
-  (do ((i 0 (+ 1 i)))
-      ((= i (vector-length out)) buf)
-    (bytevector-ieee-single-native-set! buf (* 4 i) (vector-ref out i))))
-(define prepare* (procedure->external prepare))
-
-(define (default-sample-rate-set! sr)
-  (set! default-sample-rate sr))
-(define default-sample-rate-set!* (procedure->external default-sample-rate-set!))
- 
-(values prepare* default-sample-rate-set!*)

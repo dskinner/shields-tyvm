@@ -9,11 +9,16 @@ modules = \
   modules/math.scm \
   modules/math/rect.scm \
   modules/math/vector.scm \
+  modules/snd.scm \
   modules/webaudio.scm
 
-realtime.wasm: realtime_audio.scm realtime_webgl.scm $(modules)
-	guild compile-wasm realtime_audio.scm -o realtime_audio.wasm
+realtime_audio.wasm: realtime_audio.scm $(modules)
+	guild compile-wasm -L modules realtime_audio.scm -o realtime_audio.wasm
+
+realtime_webgl.wasm: realtime_webgl.scm $(modules)
 	guild compile-wasm -L modules realtime_webgl.scm -o realtime_webgl.wasm
+
+realtime.wasm: realtime_audio.wasm realtime_webgl.wasm
 
 game.wasm: game.scm $(modules)
 	guild compile-wasm -L modules -o $@ $<
