@@ -73,7 +73,9 @@ async function gameInit() {
 			addEventListener: (target, type, listener) => target.addEventListener(type, listener),
 			preventDefault: (event) => event.preventDefault(),
 			offsetX: (event) => event.offsetX,
-			offsetY: (event) => event.offsetY
+			offsetY: (event) => event.offsetY,
+			touchX: (event) => event.touches[0].clientX,
+			touchY: (event) => event.touches[0].clientY
 		},
 		array: {
 			newFloat32Array: (size) => new Float32Array(size),

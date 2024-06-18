@@ -29,6 +29,14 @@
   "event" "offsetY"
   (ref extern) -> i32)
 
+(define-foreign touch-x
+  "event" "touchX"
+  (ref extern) -> i32)
+
+(define-foreign touch-y
+  "event" "touchY"
+  (ref extern) -> i32)
+
 (define-foreign element-width
   "element" "width"
   (ref extern) -> i32)
@@ -85,6 +93,11 @@
 (define (unit-y ev)
   (- 1 (/ (offset-y ev) canvas-height)))
 
+(define (touch-unit-x ev)
+  (/ (touch-x ev) canvas-width))
+(define (touch-unit-y ev)
+  (- 1 (/ (touch-y ev) canvas-height)))
+
 (define param-freq (audio-param-get "freq"))
 (define param-modfreq (audio-param-get "modfreq"))
 (define param-modphase (audio-param-get "modphase"))
@@ -104,6 +117,7 @@
 (define want-modphase (audio-param-val param-modphase))
 (define want-modfreq (audio-param-val param-modfreq))
 (define mouse-down? #f)
+(define touch-down? #f)
 
 (define (audio-context-toggle)
   (if (string=? "running" (audio-context-state))
@@ -128,6 +142,27 @@
 (define (handle-mouse-event ev)
   (set! want-modphase (* (unit-y ev) (audio-param-max param-modphase)))
   (set! want-modfreq (* (unit-x ev) (audio-param-max param-modfreq))))
+
+;; TODO should only handle first touch event
+(define (on-touch-start ev)
+  (prevent-default! ev)
+  (set! touch-down? #t)
+  (trace (touch-unit-x ev) ":" (touch-unit-y ev))
+  (handle-touch-event ev))
+
+(define (on-touch-move ev)
+  (prevent-default! ev)
+  (when touch-down?
+    (handle-touch-event ev)))
+
+(define (on-touch-end ev)
+  (prevent-default! ev)
+  (set! touch-down? #f)
+  (set! want-modphase 0.0))
+
+(define (handle-touch-event ev)
+  (set! want-modphase (* (touch-unit-y ev) (audio-param-max param-modphase)))
+  (set! want-modfreq (* (touch-unit-x ev) (audio-param-max param-modfreq))))
 
 (define (lt-eps eps x y)
   (< eps (abs (- x y))))
@@ -333,5 +368,13 @@
 
 (add-event-listener! (get-element-by-id "toggleaudio") "click"
                      (procedure->external (lambda (ev) (audio-context-toggle))))
+
+(add-event-listener! canvas "touchstart"
+                     (procedure->external on-touch-start))
+(add-event-listener! canvas "touchmove"
+                     (procedure->external on-touch-move))
+(add-event-listener! canvas "touchend"
+                     (procedure->external on-touch-end))
+
 
 (values difficulty-set!*)
