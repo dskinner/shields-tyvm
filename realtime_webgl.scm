@@ -84,7 +84,7 @@
 (define difficulty 10.0)
 
 (define canvas (get-element-by-id "canvas"))
-(define context (get-context canvas "2d"))
+(define ctx (get-context canvas "2d"))
 (define canvas-width (element-width canvas))
 (define canvas-height (element-height canvas))
 
@@ -199,41 +199,41 @@
   (perfects game-perfects set-game-perfects!))
 
 (define (draw-game-incoming game)
-  (save context)
-  (set-fill-color! context "#ffffff")
-  (set-text-align! context "center")
-  (set-font! context "bold 16px monospace")
+  (save)
+  (fill-color "#ffffff")
+  (text-align "center")
+  (font "bold 16px monospace")
 
-  (translate context 300.0 16.0)
+  (translate 300.0 16.0)
 
-  (fill-text context "Attack in" 0.0 0.0)
-  (set-font! context "bold 36px monospace")
-  (fill-text context (number->string* (game-incoming game)) 0.0 36.0)
+  (fill-text "Attack in" 0.0 0.0)
+  (font "bold 36px monospace")
+  (fill-text (number->string* (game-incoming game)) 0.0 36.0)
 
-  (restore context))
+  (restore))
 
 (define (draw-game game)
-  (save context)
+  (save)
 
   (draw-game-incoming game)
-  
-  (set-fill-color! context "#ffffff")
-  (set-font! context "bold 16px monospace")
-  (set-text-align! context "left")
+    
+  (fill-color "#ffffff")
+  (font "bold 16px monospace")
+  (text-align "left")
 
-  (translate context 484.0 16.0)
+  (translate 484.0 16.0)
 
-  (fill-text context "Survived:" 0.0 0.0)
-  (fill-text context (number->string* (game-attacks game)) 88.0 0.0) 
+  (fill-text "Survived:" 0.0 0.0)
+  (fill-text (number->string* (game-attacks game)) 88.0 0.0) 
 
-  (translate context 0.0 16.0)
-  (fill-text context "Perfects:" 0.0 0.0)
-  (fill-text context (number->string* (game-perfects game)) 88.0 0.0)
+  (translate 0.0 16.0)
+  (fill-text "Perfects:" 0.0 0.0)
+  (fill-text (number->string* (game-perfects game)) 88.0 0.0)
 
-  (translate context 0.0 16.0)
-  (fill-text context (string-append "  Damage:" (number->string* (to-fixed (game-damage game) 1)) "%") 0.0 0.0)
-  
-  (restore context))
+  (translate 0.0 16.0)
+  (fill-text (string-append "  Damage:" (number->string* (to-fixed (game-damage game) 1)) "%") 0.0 0.0)
+    
+  (restore))
 
 (define (rand-f32 s e)
   (+ s (* (random) (- e s))))
@@ -291,64 +291,63 @@
 (define (norm x) (/ (+ 1.0 x) 2.0))
 
 (define (draw-signal-info)
-  (save context)
+  (save)
 
-  (set-font! context "bold 16px monospace")
-  (set-text-align! context "left")
+  (font "bold 16px monospace")
+  (text-align "left")
 
-  (set-fill-color! context "#999")
+  (fill-color "#999")
 
-  (translate context 16.0 16.0)
-  (fill-text context " BASE:" 0.0 0.0)
-  (fill-text context (param->string param-freq) 58.0 0.0)
+  (translate 16.0 16.0)
+  (fill-text " BASE:" 0.0 0.0)
+  (fill-text (param->string param-freq) 58.0 0.0)
 
-  (set-fill-color! context "#ffffff")
+  (fill-color "#ffffff")
 
-  (translate context 0.0 16.0)
-  (fill-text context "PHASE:" 0.0 0.0)
-  (fill-text context (param->string param-modphase) 58.0 0.0)
+  (translate 0.0 16.0)
+  (fill-text "PHASE:" 0.0 0.0)
+  (fill-text (param->string param-modphase) 58.0 0.0)
 
-  (translate context 0.0 16.0)
-  (fill-text context " FREQ:" 0.0 0.0)
-  (fill-text context (param->string param-modfreq) 58.0 0.0)
-  
-  (restore context))
+  (translate 0.0 16.0)
+  (fill-text " FREQ:" 0.0 0.0)
+  (fill-text (param->string param-modfreq) 58.0 0.0)
+    
+  (restore))
 
 (define (main-loop now)
-  
-  (handle-wants)
-  
-  (set-fill-color! context "#140c1c")
-  (fill-rect context 0.0 0.0 canvas-width canvas-height)
+  (parameterize ((context ctx))
+    (handle-wants)
+    (fill-color "#140c1c")
+    (fill-rect 0.0 0.0 canvas-width canvas-height)
 
-  (let ((data (get-float-time-domain-data))
-        (rms (get-rms)))
+    (let ((data (get-float-time-domain-data))
+          (rms (get-rms)))
 
-    (define r (max 0.0 (min 1.0 (/ rms difficulty))))
-    (define g (- 1.0 r))
-    (stroke-style context (string-append "rgb(" (number->string* (truncate (* 255 r))) "," (number->string* (truncate (* 255 g))) ", 0" ")"))
-    
-    (line-width context 1.0)
-    (move-to context 0.0 0.0) ;; TODO
-    (do ((i 0 (+ 1 i)))
-        ((= i 1024) (stroke context))
-      (if (= 0 i)
-          (move-to context
-                   (* canvas-width (/ i 1024.0))
-                   (* canvas-height (norm (array-f32-ref data i))))
-          (line-to context
-                   (* canvas-width (/ i 1024.0))
-                   (* canvas-height (norm (array-f32-ref data i)))))))
+      (define r (max 0.0 (min 1.0 (/ rms difficulty))))
+      (define g (- 1.0 r))
+      (stroke-style (string-append "rgb(" (number->string* (truncate (* 255 r))) "," (number->string* (truncate (* 255 g))) ", 0" ")"))
+      
+      (line-width 1.0)
+      (move-to 0.0 0.0) ;; TODO
+      (do ((i 0 (+ 1 i)))
+          ((= i 1024) (stroke))
+        (if (= 0 i)
+            (move-to
+             (* canvas-width (/ i 1024.0))
+             (* canvas-height (norm (array-f32-ref data i))))
+            (line-to
+             (* canvas-width (/ i 1024.0))
+             (* canvas-height (norm (array-f32-ref data i)))))))
 
-  ;;
-  (set-fill-color! context "#ffffff")
-  (begin-path context)
-  (arc context (* (param-unit-val param-modfreq) canvas-width) (- canvas-height (* (param-unit-val param-modphase) canvas-height)) 5.0 0.0 twopi)
-  (fill context)
+    ;;
+    (fill-color "#ffffff")
+    (begin-path)
+    (arc (* (param-unit-val param-modfreq) canvas-width) (- canvas-height (* (param-unit-val param-modphase) canvas-height)) 5.0 0.0 twopi)
+    (fill)
 
-  ;;
-  (draw-signal-info)
-  (draw-game current-game)
+    ;;
+    (draw-signal-info)
+    (draw-game current-game))
  
   (request-animation-frame main-loop*))
  

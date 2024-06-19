@@ -20,17 +20,12 @@ realtime_webgl.wasm: realtime_webgl.scm $(modules)
 
 realtime.wasm: realtime_audio.wasm realtime_webgl.wasm
 
-game.wasm: game.scm $(modules)
-	guild compile-wasm -L modules -o $@ $<
-
-serve: game.wasm
+serve: realtime.wasm
 	guile -c '((@ (hoot web-server) serve))'
 
 bundle: realtime.wasm
 	rm shields-tyvm.zip || true
 	zip shields-tyvm.zip -r assets/ js-runtime/ realtime.js realtime_worklet.js realtime.css index.html realtime_audio.wasm realtime_webgl.wasm
-
-# zip game.zip -r assets/ js-runtime/ game.js game.css game.wasm index.html
 
 clean:
 	rm -f game.wasm game.zip
