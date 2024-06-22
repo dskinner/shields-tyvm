@@ -9,6 +9,10 @@
         (dom canvas)
         (webaudio))
 
+(define-foreign canvas-get-context
+  "element" "getContext"
+  (ref extern) (ref string) -> (ref extern))
+
 (define-foreign get-element-by-id
   "document" "getElementById"
   (ref string) -> (ref null extern))
@@ -84,7 +88,7 @@
 (define difficulty 10.0)
 
 (define canvas (get-element-by-id "canvas"))
-(define ctx (get-context canvas "2d"))
+(current-context (canvas-get-context canvas "2d"))
 (define canvas-width (element-width canvas))
 (define canvas-height (element-height canvas))
 
@@ -199,8 +203,7 @@
   (perfects game-perfects set-game-perfects!))
 
 (define (draw-game-incoming game)
-  (save)
-  (fill-color "#ffffff")
+  (fill-style "#ffffff")
   (text-align "center")
   (font "bold 16px monospace")
 
@@ -208,16 +211,12 @@
 
   (fill-text "Attack in" 0.0 0.0)
   (font "bold 36px monospace")
-  (fill-text (number->string* (game-incoming game)) 0.0 36.0)
-
-  (restore))
+  (fill-text (number->string* (game-incoming game)) 0.0 36.0))
 
 (define (draw-game game)
-  (save)
-
-  (draw-game-incoming game)
+  (call-with-restore (lambda () (draw-game-incoming game)))
     
-  (fill-color "#ffffff")
+  (fill-style "#ffffff")
   (font "bold 16px monospace")
   (text-align "left")
 
@@ -231,9 +230,7 @@
   (fill-text (number->string* (game-perfects game)) 88.0 0.0)
 
   (translate 0.0 16.0)
-  (fill-text (string-append "  Damage:" (number->string* (to-fixed (game-damage game) 1)) "%") 0.0 0.0)
-    
-  (restore))
+  (fill-text (string-append "  Damage:" (number->string* (to-fixed (game-damage game) 1)) "%") 0.0 0.0))
 
 (define (rand-f32 s e)
   (+ s (* (random) (- e s))))
@@ -291,18 +288,16 @@
 (define (norm x) (/ (+ 1.0 x) 2.0))
 
 (define (draw-signal-info)
-  (save)
-
   (font "bold 16px monospace")
   (text-align "left")
 
-  (fill-color "#999")
+  (fill-style "#999")
 
   (translate 16.0 16.0)
   (fill-text " BASE:" 0.0 0.0)
   (fill-text (param->string param-freq) 58.0 0.0)
 
-  (fill-color "#ffffff")
+  (fill-style "#ffffff")
 
   (translate 0.0 16.0)
   (fill-text "PHASE:" 0.0 0.0)
@@ -310,44 +305,39 @@
 
   (translate 0.0 16.0)
   (fill-text " FREQ:" 0.0 0.0)
-  (fill-text (param->string param-modfreq) 58.0 0.0)
-    
-  (restore))
+  (fill-text (param->string param-modfreq) 58.0 0.0))
 
 (define (main-loop now)
-  (parameterize ((context ctx))
-    (handle-wants)
-    (fill-color "#140c1c")
-    (fill-rect 0.0 0.0 canvas-width canvas-height)
+  (handle-wants)
+  (fill-style "#140c1c")
+  (fill-rect 0.0 0.0 canvas-width canvas-height)
 
-    (let ((data (get-float-time-domain-data))
-          (rms (get-rms)))
+  (let ((data (get-float-time-domain-data))
+        (rms (get-rms)))
 
-      (define r (max 0.0 (min 1.0 (/ rms difficulty))))
-      (define g (- 1.0 r))
-      (stroke-style (string-append "rgb(" (number->string* (truncate (* 255 r))) "," (number->string* (truncate (* 255 g))) ", 0" ")"))
-      
-      (line-width 1.0)
-      (move-to 0.0 0.0) ;; TODO
-      (do ((i 0 (+ 1 i)))
-          ((= i 1024) (stroke))
-        (if (= 0 i)
-            (move-to
-             (* canvas-width (/ i 1024.0))
-             (* canvas-height (norm (array-f32-ref data i))))
-            (line-to
-             (* canvas-width (/ i 1024.0))
-             (* canvas-height (norm (array-f32-ref data i)))))))
+    (define r (max 0.0 (min 1.0 (/ rms difficulty))))
+    (define g (- 1.0 r))
+    (stroke-style (string-append "rgb(" (number->string* (truncate (* 255 r))) "," (number->string* (truncate (* 255 g))) ", 0" ")"))
+    
+    (line-width 1.0)
+    (move-to 0.0 0.0) ;; TODO
+    (do ((i 0 (+ 1 i)))
+        ((= i 1024) (stroke))
+      (if (= 0 i)
+          (move-to
+           (* canvas-width (/ i 1024.0))
+           (* canvas-height (norm (array-f32-ref data i))))
+          (line-to
+           (* canvas-width (/ i 1024.0))
+           (* canvas-height (norm (array-f32-ref data i)))))))
 
-    ;;
-    (fill-color "#ffffff")
-    (begin-path)
-    (arc (* (param-unit-val param-modfreq) canvas-width) (- canvas-height (* (param-unit-val param-modphase) canvas-height)) 5.0 0.0 twopi)
-    (fill)
+  (fill-style "#ffffff")
+  (begin-path)
+  (arc (* (param-unit-val param-modfreq) canvas-width) (- canvas-height (* (param-unit-val param-modphase) canvas-height)) 5.0 0.0 twopi)
+  (fill)
 
-    ;;
-    (draw-signal-info)
-    (draw-game current-game))
+  (call-with-restore (lambda () (draw-signal-info)))
+  (call-with-restore (lambda () (draw-game current-game)))
  
   (request-animation-frame main-loop*))
  

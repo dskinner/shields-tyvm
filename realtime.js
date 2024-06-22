@@ -1,3 +1,5 @@
+import { map as canvasMap } from "./modules/dom/canvas/ffi.js";
+
 let audioContext;
 let audioSink;
 let modules = {};
@@ -23,7 +25,7 @@ async function gameInit() {
 	audioSink.connect(analyser);
 	analyser.connect(audioContext.destination);
 
-	const scm = await Scheme.load_main("realtime_webgl.wasm", {}, {
+	const userImports = {
 		webaudio: {
 			audioParamGet: (name) => audioSink.parameters.get(name),
 			audioParamSet: (param, value) => param.setValueAtTime(value, audioContext.currentTime),
@@ -41,31 +43,8 @@ async function gameInit() {
 		document: {
 			getElementById: (id) => document.getElementById(id)
 		},
-		canvas: {
-			getContext: (elem, type) => elem.getContext(type),
-			setFillColor: (ctx, color) => ctx.fillStyle = color,
-			setFont: (ctx, font) => ctx.font = font,
-			setTextAlign: (ctx, align) => ctx.textAlign = align,
-			clearRect: (ctx, x, y, w, h) => ctx.clearRect(x, y, w, h),
-			fillRect: (ctx, x, y, w, h) => ctx.fillRect(x, y, w, h),
-			fillText: (ctx, text, x, y) => ctx.fillText(text, x, y),
-			drawImage: (ctx, image, sx, sy, sw, sh, dx, dy, dw, dh) => ctx.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh),
-			setScale: (ctx, sx, sy) => ctx.scale(sx, sy),
-			setTransform: (ctx, a, b, c, d, e, f) => ctx.setTransform(a, b, c, d, e, f),
-			setImageSmoothingEnabled: (ctx, enabled) => ctx.imageSmoothingEnabled = (enabled == 1),
-			beginPath: (ctx) => ctx.beginPath(),
-			fill: (ctx) => ctx.fill(),
-			stroke: (ctx) => ctx.stroke(),
-			arc: (ctx, a, b, c, d, e) => ctx.arc(a, b, c, d, e, false),
-			moveTo: (ctx, x, y) => ctx.moveTo(x, y),
-			lineTo: (ctx, x, y) => ctx.lineTo(x, y),
-			lineWidth: (ctx, w) => ctx.lineWidth = w,
-			strokeStyle: (ctx, style) => ctx.strokeStyle = style,
-			save: (ctx) => ctx.save(),
-			restore: (ctx) => ctx.restore(),
-			translate: (ctx, x, y) => ctx.translate(x, y)
-		},
 		element: {
+			getContext: (elem, type) => elem.getContext(type),
 			width: (el) => el.width,
 			height: (el) => el.height
 		},
@@ -101,7 +80,9 @@ async function gameInit() {
 				return rms;
 			}
 		}
-	});
+	};
+
+	const scm = await Scheme.load_main("realtime_webgl.wasm", {}, Object.assign({}, userImports, canvasMap));
 
 	for (const inp of document.querySelectorAll("input[name=difficulty]")) {
 		inp.onchange = function() {

@@ -25,7 +25,7 @@ serve: realtime.wasm
 
 bundle: realtime.wasm
 	rm shields-tyvm.zip || true
-	zip shields-tyvm.zip -r assets/ js-runtime/ realtime.js realtime_worklet.js realtime.css index.html realtime_audio.wasm realtime_webgl.wasm
+	zip shields-tyvm.zip -r assets/ js-runtime/ modules/dom/canvas/ffi.js realtime.js realtime_worklet.js realtime.css index.html realtime_audio.wasm realtime_webgl.wasm
 
 clean:
 	rm -f game.wasm game.zip
